@@ -1,0 +1,65 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <title>wrazz</title>
+
+  <!--
+    Proper squircle background (superellipse n=4).
+    Anchor points at the four side midpoints; control point factor ≈ 0.909
+    ensures the 45° corner sits at 0.841r — the true superellipse value.
+  -->
+  <path
+    d="M 512,256
+       C 512,489 489,512 256,512
+       C 23,512 0,489 0,256
+       C 0,23 23,0 256,0
+       C 489,0 512,23 512,256
+       Z"
+    fill="#f5f0e4"
+  />
+
+  <!--
+    Italic monospace w — uniform stroke width throughout.
+
+    Three top points:
+      LT = (118, 155)   ← flat serif here
+      MT = (262, 155)   ← flat serif here
+      RT = (406, 155)   ← i-dot circle above
+
+    Two valleys with smooth round bottoms (cubic bezier):
+      V1 ≈ (188, 375)   ← first under-hump; em-dash below
+      V2 ≈ (332, 375)   ← second under-hump
+
+    Bezier geometry:
+      The straight strokes transition into curves at y=292 (80px above each valley).
+      Control points are aligned to the incoming/outgoing stroke directions so the
+      curve meets the straight segment with no kink (C1 continuous).
+
+      V1 entry  (162, 292) → C 197,400 179,398 → V1 exit (215, 292)
+      V2 entry  (306, 292) → C 341,400 323,398 → V2 exit (359, 292)
+  -->
+  <path
+    d="M 118,155
+       L 162,292
+       C 197,400 179,398 215,292
+       L 262,155
+       L 306,292
+       C 341,400 323,398 359,292
+       L 406,155"
+    fill="none"
+    stroke="#9a8868"
+    stroke-width="24"
+    stroke-linecap="butt"
+    stroke-linejoin="bevel"
+  />
+
+  <!-- Flat serif at LT (first top point, x=118) -->
+  <rect x="83" y="147" width="70" height="12" fill="#9a8868"/>
+
+  <!-- Flat serif at MT (second top point, x=262) -->
+  <rect x="227" y="147" width="70" height="12" fill="#9a8868"/>
+
+  <!-- i-dot above RT (third top point, x=406) -->
+  <circle cx="406" cy="118" r="17" fill="#9a8868"/>
+
+  <!-- Em-dash below the first under-hump (centered at V1 x≈188) -->
+  <rect x="138" y="395" width="100" height="12" fill="#9a8868"/>
+</svg>
