@@ -1,6 +1,10 @@
 # wrazz — Design Document
 
 wrazz is a self-hosted personal journal built around plain Markdown files.
+Think of it as VSCode's artsy cousin: the same structural chrome — sidebar, editor
+pane, status bar, eventual command palette — but serif fonts, a warm paper-driven
+editor space, and a focus on writing rather than coding.
+
 This document describes every architectural decision in the project: what was chosen,
 what was ruled out, and why. It is intended to be read before touching any code.
 
@@ -11,7 +15,8 @@ what was ruled out, and why. It is intended to be read before touching any code.
 - **Source-mode editing.** Markdown is always visible as written. No hidden syntax,
   no WYSIWYG rendering in the editor pane. What you type is what is stored.
 - **Paper feel.** The editor should feel like writing, not like a developer tool.
-  Variable fonts, warm palette, generous leading.
+  Variable fonts, warm palette, generous leading. The structural chrome is familiar
+  (VSCode-like sidebar, status bar, command palette); the editor space is its own thing.
 - **Extensible by design.** The architecture is shaped for extensions from day one,
   even before extension machinery exists. Hook points are named and reserved;
   filling them in later is adding an implementation, not a refactor.
@@ -105,7 +110,7 @@ on this; it depends on nothing in the workspace.
 
 ```rust
 pub struct FileEntry {
-    pub id: String,              // filename stem — never stored inside the file
+    pub id: String,              // relative path including extension — never stored inside the file
     pub title: String,
     pub content: String,
     pub tags: Vec<String>,
@@ -116,16 +121,18 @@ pub struct FileEntry {
 
 ### File IDs
 
-The file ID is the **filename stem** — the filename without the `.md` extension.
+The file ID is the **full relative path including extension**, rooted at the data directory.
 
-- A file named `morning-pages.md` has ID `morning-pages`.
-- The API addresses files by this ID: `GET /api/files/morning-pages`.
-- wrazz generates IDs by slugifying the title on creation: "Evening Thoughts" → `evening-thoughts`.
-  If that stem is taken, it appends `-2`, `-3`, etc.
+- A file at `<data>/morning-pages.md` has ID `morning-pages.md`.
+- A file at `<data>/journal/2026/april.md` has ID `journal/2026/april.md`.
+- The API addresses files by this ID: `GET /api/files/morning-pages.md`.
+- Because IDs can contain slashes, the route uses a wildcard parameter (`/api/files/*id`).
 
-Human-readable IDs were chosen over UUIDs or hashes for one reason: a human can
-predict, read, and type the ID. There is no collision risk because two files cannot
-share a name in the same directory.
+wrazz generates IDs by slugifying the title on creation: "Evening Thoughts" → `evening-thoughts.md`.
+If that path is taken, it appends `-2`, `-3`, etc.
+
+Human-readable paths were chosen over UUIDs or hashes: a human can predict, read, type,
+and navigate the ID. There is no collision risk because two files cannot share a path.
 
 ### Storage format
 
@@ -142,7 +149,7 @@ Entry body in Markdown.
 ```
 
 Only three fields appear in front matter: `title`, `tags` (omitted if empty),
-and `created_at`. `id` is not stored (it is the filename). `updated_at` is not
+and `created_at`. `id` is not stored (it is the relative path). `updated_at` is not
 stored (it is the filesystem mtime, updated automatically on every write).
 
 ### Naked file support
@@ -157,7 +164,7 @@ Just some thoughts I wrote in my editor.
 ```
 
 For naked files:
-- `title` is taken from the first `# Heading` line, or the filename stem if none.
+- `title` is taken from the first `# Heading` line, or the filename stem (without extension) if none.
 - `created_at` and `updated_at` both fall back to the file's mtime.
 - `tags` is empty.
 
@@ -172,10 +179,14 @@ pub trait Backend: Send + Sync {
     async fn list_files(&self) -> Result<Vec<FileEntry>>;
     async fn get_file(&self, id: &str) -> Result<FileEntry>;
     async fn create_file(&self, title: String, content: String, tags: Vec<String>) -> Result<FileEntry>;
-    async fn update_file(&self, id: &str, patch: FilePatch) -> Result<FileEntry>;
+    async fn update_file(&self, id: &str, title: String, content: String, tags: Vec<String>) -> Result<FileEntry>;
     async fn delete_file(&self, id: &str) -> Result<()>;
 }
 ```
+
+Updates are full replacements — no partial patching. Files are small enough that a
+full write is always correct, and single-user editing removes any need to merge
+concurrent changes.
 
 | Implementation | Used when | How it works |
 |---|---|---|
@@ -198,11 +209,14 @@ reads and writes Markdown files, exposes a REST API.
 |--------|------|-------------|
 | GET | `/api/files` | List all files, sorted by `updated_at` desc |
 | POST | `/api/files` | Create file |
-| GET | `/api/files/:id` | Get one file |
-| PUT | `/api/files/:id` | Update file (partial — only provided fields) |
-| DELETE | `/api/files/:id` | Delete file |
+| GET | `/api/files/*id` | Get one file |
+| PUT | `/api/files/*id` | Update file (full replacement) |
+| DELETE | `/api/files/*id` | Delete file |
 
 All request and response bodies are JSON. Timestamps are RFC 3339 strings.
+
+The `*id` routes use a wildcard parameter because file IDs are relative paths and
+can contain slashes (e.g. `journal/2026/april.md`).
 
 ### Configuration
 
@@ -258,9 +272,25 @@ graph TD
     App --> StatusBar["StatusBar\n(footer)"]
 
     FileList -->|onSelect| App
-    Editor -->|PUT /api/files/:id| API["API client\nfiles.ts"]
+    Editor -->|PUT /api/files/*id| API["API client\nfiles.ts"]
     App -->|GET /api/files| API
 ```
+
+### Design language
+
+wrazz is deliberately VSCode-shaped: sidebar on the left, editor pane in the center,
+status bar along the bottom, and a command palette in the title bar once enough
+features exist to warrant one. Users who know VSCode know where to look.
+
+The difference is entirely in feel. Where VSCode is a developer tool, wrazz is a
+writing surface:
+- Serif body fonts in the editor (Georgia / a variable serif)
+- Warm paper-toned background (`--paper: #faf8f3`)
+- No editor chrome — no line numbers, no gutter, no monospace
+- Typography that rewards long-form reading and writing
+
+The chrome (sidebar, status bar, command palette) uses the same neutral sans-serif
+density as a developer tool. The editor pane breaks from that completely.
 
 ### Editor design intent
 
