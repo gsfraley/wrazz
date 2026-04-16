@@ -15,7 +15,7 @@ pub fn router(backend: Arc<dyn Backend>) -> Router {
     Router::new()
         .route("/api/files", get(list_files).post(create_file))
         .route(
-            "/api/files/:id",
+            "/api/files/{id}",
             get(get_file).put(update_file).delete(delete_file),
         )
         .with_state(backend)
