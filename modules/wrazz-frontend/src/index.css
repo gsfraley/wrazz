@@ -1,0 +1,186 @@
+:root {
+  --paper: #faf8f3;
+  --ink: #1a1a18;
+  --ink-muted: #6b6b63;
+  --border: #ddd9ce;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* ── Top-level layout ─────────────────────────────────────────── */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.workspace {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────── */
+
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-heading {
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.file-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  padding: 4px 0;
+}
+
+.file-item {
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+.file-item:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.file-item.active {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* ── Editor ───────────────────────────────────────────────────── */
+
+.editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-toolbar {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+}
+
+.editor-title {
+  width: 100%;
+  padding: 20px 40px 8px;
+  font-size: 22px;
+  font-family: inherit;
+  color: var(--ink);
+  border: none;
+  background: transparent;
+  outline: none;
+}
+
+.editor-title::placeholder {
+  color: var(--ink-muted);
+}
+
+.editor-body {
+  flex: 1;
+  padding: 8px 40px 32px;
+  resize: none;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--ink);
+  outline: none;
+}
+
+.editor-body::placeholder {
+  color: var(--ink-muted);
+}
+
+.editor-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
+/* ── Status bar ───────────────────────────────────────────────── */
+
+.status-bar {
+  height: 24px;
+  border-top: 1px solid var(--border);
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink-muted);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 3px;
+}
+
+button:hover {
+  color: var(--ink);
+  border-color: var(--ink-muted);
+}
