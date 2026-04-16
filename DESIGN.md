@@ -225,7 +225,7 @@ handles this without any wildcard special-casing.
 | Variable | Default | Description |
 |---|---|---|
 | `WRAZZ_DATA_DIR` | `./data` | Directory for Markdown files |
-| `WRAZZ_BIND` | `127.0.0.1:3000` | Address and port to listen on |
+| `WRAZZ_BIND` | `127.0.0.1:3000` | Address and port to listen on — loopback-only by default; set to `0.0.0.0:3000` for container / server deployments |
 
 ### Hook points
 

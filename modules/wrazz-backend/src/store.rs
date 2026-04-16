@@ -50,7 +50,9 @@ pub struct Store {
 
 impl Store {
     pub fn new(data_dir: impl Into<PathBuf>) -> Self {
-        Self { data_dir: data_dir.into() }
+        Self {
+            data_dir: data_dir.into(),
+        }
     }
 
     fn full_path(&self, id: &str) -> PathBuf {
@@ -67,8 +69,7 @@ impl Store {
                 .into_iter()
                 .filter_map(|e| e.ok())
                 .filter(|e| {
-                    e.file_type().is_file()
-                        && e.path().extension().is_some_and(|x| x == "md")
+                    e.file_type().is_file() && e.path().extension().is_some_and(|x| x == "md")
                 })
                 .map(|e| e.path().to_path_buf())
                 .collect::<Vec<_>>()
@@ -123,19 +124,19 @@ impl Store {
     fn parse(&self, id: &str, raw: &str, updated_at: DateTime<Utc>) -> StoreResult<FileEntry> {
         if raw.starts_with("---\n") {
             let rest = &raw[4..];
-            let close = rest
-                .find("\n---\n")
-                .ok_or_else(|| StoreError::Parse {
-                    file: id.to_string(),
-                    message: "unclosed front matter".into(),
-                })?;
+            let close = rest.find("\n---\n").ok_or_else(|| StoreError::Parse {
+                file: id.to_string(),
+                message: "unclosed front matter".into(),
+            })?;
 
             let yaml = &rest[..close];
             // Skip the "\n---\n" delimiter (5 chars), then any blank lines.
             let content = rest[close + 5..].trim_start_matches('\n').to_string();
 
-            let fm: FrontMatter = serde_yaml_ng::from_str(yaml)
-                .map_err(|e| StoreError::Parse { file: id.to_string(), message: e.to_string() })?;
+            let fm: FrontMatter = serde_yaml_ng::from_str(yaml).map_err(|e| StoreError::Parse {
+                file: id.to_string(),
+                message: e.to_string(),
+            })?;
 
             Ok(FileEntry {
                 id: id.to_string(),
@@ -164,7 +165,12 @@ impl Store {
         }
     }
 
-    fn serialize(title: &str, tags: &[String], created_at: &DateTime<Utc>, content: &str) -> String {
+    fn serialize(
+        title: &str,
+        tags: &[String],
+        created_at: &DateTime<Utc>,
+        content: &str,
+    ) -> String {
         let fm = FrontMatterOut {
             title,
             tags,
@@ -175,7 +181,12 @@ impl Store {
         format!("---\n{yaml}---\n\n{content}")
     }
 
-    pub async fn create(&self, title: String, content: String, tags: Vec<String>) -> StoreResult<FileEntry> {
+    pub async fn create(
+        &self,
+        title: String,
+        content: String,
+        tags: Vec<String>,
+    ) -> StoreResult<FileEntry> {
         let stem = slugify(&title);
         let id = self.find_available_id(&stem).await?;
         let path = self.full_path(&id);
@@ -209,7 +220,9 @@ impl Store {
                 return Ok(candidate);
             }
         }
-        Err(StoreError::Conflict { id: stem.to_string() })
+        Err(StoreError::Conflict {
+            id: stem.to_string(),
+        })
     }
 
     pub async fn save(
@@ -223,9 +236,12 @@ impl Store {
         let existing = self.load(id).await?;
         let path = self.full_path(id);
 
-        fs::write(&path, Self::serialize(&title, &tags, &existing.created_at, &content))
-            .await
-            .map_err(StoreError::Io)?;
+        fs::write(
+            &path,
+            Self::serialize(&title, &tags, &existing.created_at, &content),
+        )
+        .await
+        .map_err(StoreError::Io)?;
 
         self.load(id).await
     }

@@ -33,12 +33,29 @@ impl Backend for LocalBackend {
         self.store.load(id).await.map_err(Into::into)
     }
 
-    async fn create_file(&self, title: String, content: String, tags: Vec<String>) -> BackendResult<FileEntry> {
-        self.store.create(title, content, tags).await.map_err(Into::into)
+    async fn create_file(
+        &self,
+        title: String,
+        content: String,
+        tags: Vec<String>,
+    ) -> BackendResult<FileEntry> {
+        self.store
+            .create(title, content, tags)
+            .await
+            .map_err(Into::into)
     }
 
-    async fn update_file(&self, id: &str, title: String, content: String, tags: Vec<String>) -> BackendResult<FileEntry> {
-        self.store.save(id, title, content, tags).await.map_err(Into::into)
+    async fn update_file(
+        &self,
+        id: &str,
+        title: String,
+        content: String,
+        tags: Vec<String>,
+    ) -> BackendResult<FileEntry> {
+        self.store
+            .save(id, title, content, tags)
+            .await
+            .map_err(Into::into)
     }
 
     async fn delete_file(&self, id: &str) -> BackendResult<()> {
