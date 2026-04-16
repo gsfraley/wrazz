@@ -1,0 +1,16 @@
+[package]
+name = "wrazz-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+chrono = { version = "0.4", features = ["serde"] }
+pulldown-cmark = "0.12"
+serde_yaml_ng = "0.10"

@@ -1,0 +1,23 @@
+# Rust
+target/
+Cargo.lock
+
+# Node / frontend
+node_modules/
+modules/wrazz-frontend/dist/
+
+# Tauri
+modules/wrazz-desktop/src-tauri/target/
+
+# Extension build artifacts
+extensions/*/target/
+extensions/*/*.wasm
+
+# TypeScript build cache
+modules/wrazz-frontend/tsconfig.tsbuildinfo
+
+# Editor
+.DS_Store
+*.swp
+.idea/
+.vscode/settings.json

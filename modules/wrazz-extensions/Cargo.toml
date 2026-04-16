@@ -1,0 +1,13 @@
+[package]
+name = "wrazz-extensions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+wrazz-core = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+wasmtime = { version = "27", features = ["component-model"] }
+wasmtime-wasi = "27"

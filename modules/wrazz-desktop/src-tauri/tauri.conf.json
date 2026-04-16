@@ -1,0 +1,30 @@
+{
+  "productName": "wrazz",
+  "version": "0.1.0",
+  "identifier": "dev.fraley.wrazz",
+  "build": {
+    "frontendDist": "../../wrazz-frontend/dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "cd ../wrazz-frontend && yarn dev",
+    "beforeBuildCommand": "cd ../wrazz-frontend && yarn build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "wrazz",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 500
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png"]
+  }
+}

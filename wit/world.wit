@@ -1,0 +1,51 @@
+package wrazz:extensions;
+
+/// Metadata describing a journal entry, passed to extensions on hooks and render calls.
+interface types {
+    record entry-meta {
+        id: string,
+        title: string,
+        /// Unix timestamp (seconds)
+        created-at: u64,
+        /// Unix timestamp (seconds)
+        updated-at: u64,
+        tags: list<string>,
+    }
+}
+
+/// Lifecycle hooks — extensions can transform content or react to events.
+interface hooks {
+    use types.{entry-meta};
+
+    /// Called before an entry is written to disk. Return value replaces the content.
+    on-before-save: func(content: string, meta: entry-meta) -> string;
+
+    /// Called after an entry is written to disk.
+    on-after-save: func(meta: entry-meta);
+
+    /// Called when the user opens an entry in the editor.
+    on-entry-open: func(meta: entry-meta);
+}
+
+/// UI contribution — extensions can inject content into named host slots.
+interface ui {
+    use types.{entry-meta};
+
+    record slot-output {
+        /// Named host slot: "sidebar", "toolbar", "status-bar"
+        slot: string,
+        /// HTML fragment; host renders it in a sandboxed container
+        html: string,
+    }
+
+    /// Called by the host after navigation or save. Return slot content to render.
+    render: func(meta: entry-meta) -> list<slot-output>;
+}
+
+/// The extension world: host provides types, extension exports hooks and ui.
+world extension {
+    use types.{entry-meta};
+
+    export hooks;
+    export ui;
+}
