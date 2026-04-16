@@ -126,7 +126,7 @@ The file ID is the **full relative path including extension**, rooted at the dat
 - A file at `<data>/morning-pages.md` has ID `morning-pages.md`.
 - A file at `<data>/journal/2026/april.md` has ID `journal/2026/april.md`.
 - The API addresses files by this ID: `GET /api/files/morning-pages.md`.
-- Because IDs can contain slashes, the route uses a wildcard parameter (`/api/files/*id`).
+- IDs with slashes are percent-encoded in the URL: `GET /api/files/journal%2F2026%2Fapril.md`.
 
 wrazz generates IDs by slugifying the title on creation: "Evening Thoughts" → `evening-thoughts.md`.
 If that path is taken, it appends `-2`, `-3`, etc.
@@ -209,14 +209,16 @@ reads and writes Markdown files, exposes a REST API.
 |--------|------|-------------|
 | GET | `/api/files` | List all files, sorted by `updated_at` desc |
 | POST | `/api/files` | Create file |
-| GET | `/api/files/*id` | Get one file |
-| PUT | `/api/files/*id` | Update file (full replacement) |
-| DELETE | `/api/files/*id` | Delete file |
+| GET | `/api/files/:id` | Get one file |
+| PUT | `/api/files/:id` | Update file (full replacement) |
+| DELETE | `/api/files/:id` | Delete file |
 
 All request and response bodies are JSON. Timestamps are RFC 3339 strings.
 
-The `*id` routes use a wildcard parameter because file IDs are relative paths and
-can contain slashes (e.g. `journal/2026/april.md`).
+File IDs are relative paths and may contain slashes (e.g. `journal/2026/april.md`).
+Clients percent-encode the ID before placing it in the URL
+(`journal%2F2026%2Fapril.md`); the server decodes it. Standard `:id` routing
+handles this without any wildcard special-casing.
 
 ### Configuration
 
@@ -272,7 +274,7 @@ graph TD
     App --> StatusBar["StatusBar\n(footer)"]
 
     FileList -->|onSelect| App
-    Editor -->|PUT /api/files/*id| API["API client\nfiles.ts"]
+    Editor -->|PUT /api/files/:id| API["API client\nfiles.ts"]
     App -->|GET /api/files| API
 ```
 
