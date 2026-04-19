@@ -1,6 +1,14 @@
-/// Assembles the full Axum router: auth routes under `/api/auth/` and
-/// user-scoped file CRUD under `/api/files/`. All file handlers require a
-/// valid session via the [`AuthUser`] extractor; auth routes are open.
+/// Assembles the full Axum router.
+///
+/// - `POST /api/auth/login`, `POST /api/auth/logout` — open
+/// - `GET /api/auth/oidc/redirect`, `GET /api/auth/oidc/callback` — open
+/// - `POST /api/user` — admin only
+/// - `GET /api/user/self`, `GET /api/user/id:<uuid>` — authenticated
+/// - `GET|POST /api/files`, `GET|PUT|DELETE /api/files/{id}` — authenticated
+pub mod auth;
+pub mod oidc;
+pub mod user;
+
 use axum::{
     Json, Router,
     extract::{Path, State},
@@ -13,8 +21,7 @@ use tower_http::{cors::CorsLayer, services::{ServeDir, ServeFile}};
 use wrazz_backend::StoreError;
 use wrazz_core::FileEntry;
 
-use crate::auth::{self, AuthUser};
-use crate::oidc;
+use auth::AuthUser;
 use crate::state::AppState;
 
 /// `static_dir` is the path to the built frontend assets. When `Some`, all
@@ -22,12 +29,17 @@ use crate::state::AppState;
 /// `index.html` as the fallback so client-side routing works correctly.
 pub fn router(state: AppState, static_dir: Option<String>) -> Router {
     let auth_routes = Router::new()
-        .route("/register", post(auth::register))
         .route("/login", post(auth::login))
         .route("/logout", post(auth::logout))
-        .route("/me", get(auth::me))
         .route("/oidc/redirect", get(oidc::oidc_redirect))
         .route("/oidc/callback", get(oidc::oidc_callback));
+
+    // Static segment (/self) must be registered before the parameterised one
+    // (/{handle}) so axum's router gives it priority.
+    let user_routes = Router::new()
+        .route("/user", post(user::create_user))
+        .route("/user/self", get(user::get_user_self))
+        .route("/user/{handle}", get(user::get_user_by_handle));
 
     let file_routes = Router::new()
         .route("/files", get(list_files).post(create_file))
@@ -35,6 +47,7 @@ pub fn router(state: AppState, static_dir: Option<String>) -> Router {
 
     let api = Router::new()
         .nest("/auth", auth_routes)
+        .merge(user_routes)
         .merge(file_routes);
 
     let base = Router::new()

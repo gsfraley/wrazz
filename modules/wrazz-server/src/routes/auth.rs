@@ -1,7 +1,4 @@
-use argon2::{
-    Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
-    password_hash::{SaltString, rand_core::OsRng},
-};
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::{Json, extract::{FromRef, State}, http::StatusCode};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 use serde::Deserialize;
@@ -60,47 +57,12 @@ where
 // --- Request bodies ---
 
 #[derive(Deserialize)]
-pub struct RegisterRequest {
-    pub username: String,
-    pub password: String,
-    pub display_name: String,
-}
-
-#[derive(Deserialize)]
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
 }
 
 // --- Handlers ---
-
-/// `POST /api/auth/register` — creates a new password-auth account.
-///
-/// Returns `409 Conflict` if the username is already taken.
-pub async fn register(
-    State(state): State<AppState>,
-    Json(req): Json<RegisterRequest>,
-) -> Result<(StatusCode, Json<User>), (StatusCode, String)> {
-    let salt = SaltString::generate(&mut OsRng);
-    let hash = Argon2::default()
-        .hash_password(req.password.as_bytes(), &salt)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-        .to_string();
-
-    let user =
-        db::create_user_with_password(&state.pool, &req.display_name, &req.username, &hash)
-            .await
-            .map_err(|e| {
-                if let sqlx::Error::Database(ref dbe) = e {
-                    if dbe.is_unique_violation() {
-                        return (StatusCode::CONFLICT, "username already taken".into());
-                    }
-                }
-                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-            })?;
-
-    Ok((StatusCode::CREATED, Json(user)))
-}
 
 /// `POST /api/auth/login` — verifies credentials and sets a session cookie.
 ///
@@ -150,9 +112,4 @@ pub async fn logout(
     }
     let removal = Cookie::build(SESSION_COOKIE).path("/").build();
     (jar.remove(removal), StatusCode::NO_CONTENT)
-}
-
-/// `GET /api/auth/me` — returns the currently authenticated user.
-pub async fn me(auth_user: AuthUser) -> Json<User> {
-    Json(auth_user.0)
 }

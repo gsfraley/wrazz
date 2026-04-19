@@ -20,7 +20,7 @@ use openidconnect::{
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
-use crate::auth::SESSION_COOKIE;
+use super::auth::SESSION_COOKIE;
 use crate::db;
 use crate::state::AppState;
 

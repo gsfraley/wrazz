@@ -3,7 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use chrono::Duration;
 use sqlx::PgPool;
 
-use crate::oidc::OidcProvider;
+use crate::routes::oidc::OidcProvider;
 use crate::store_cache::StoreCache;
 
 /// Shared server state injected into every Axum handler via [`State`].

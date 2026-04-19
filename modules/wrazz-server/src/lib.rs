@@ -34,4 +34,10 @@ pub struct User {
     pub id: Uuid,
     pub display_name: String,
     pub created_at: DateTime<Utc>,
+    /// Whether this account has administrative privileges.
+    ///
+    /// Admins can create new user accounts (`POST /api/user`) and look up
+    /// any user by ID. The first admin is provisioned at startup via
+    /// `WRAZZ_BOOTSTRAP_ADMIN`.
+    pub is_admin: bool,
 }
