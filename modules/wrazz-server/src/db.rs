@@ -1,11 +1,14 @@
 //! Database query functions.
 //!
 //! All queries use the runtime `sqlx::query_as` API rather than the
-//! compile-time `query!` macros, so no `DATABASE_URL` is required at build
-//! time. Type correctness is checked at runtime on first execution instead.
+//! compile-time `query!` macros, so no database URL is required at build time.
+//!
+//! UUID columns are stored as 16-byte BLOBs (sqlx default for SQLite).
+//! Session expiry is stored as a Unix timestamp (INTEGER) to avoid
+//! text-comparison ambiguity.
 
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use wrazz_server::User;
@@ -22,30 +25,29 @@ struct UserWithHash {
 
 // --- User queries ---
 
-pub async fn get_user_by_id(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<User>> {
+pub async fn get_user_by_id(pool: &SqlitePool, id: Uuid) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
-        "SELECT id, display_name, created_at, is_admin FROM users WHERE id = $1",
+        "SELECT id, display_name, created_at, is_admin FROM users WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
     .await
 }
 
-/// Returns `true` if at least one user with `is_admin = true` exists.
+/// Returns `true` if at least one user with `is_admin = 1` exists.
 /// Used at startup to decide whether to run the bootstrap.
-pub async fn has_any_admin(pool: &PgPool) -> sqlx::Result<bool> {
+pub async fn has_any_admin(pool: &SqlitePool) -> sqlx::Result<bool> {
     let row: (bool,) =
-        sqlx::query_as("SELECT EXISTS(SELECT 1 FROM users WHERE is_admin = true)")
+        sqlx::query_as("SELECT EXISTS(SELECT 1 FROM users WHERE is_admin = 1)")
             .fetch_one(pool)
             .await?;
     Ok(row.0)
 }
 
 /// Looks up a user by their password login username and returns the user
-/// together with their stored argon2 hash, so the caller can verify the
-/// supplied password before creating a session.
+/// together with their stored argon2 hash.
 pub async fn get_user_by_password_subject(
-    pool: &PgPool,
+    pool: &SqlitePool,
     username: &str,
 ) -> sqlx::Result<Option<(User, String)>> {
     let row = sqlx::query_as::<_, UserWithHash>(
@@ -53,7 +55,7 @@ pub async fn get_user_by_password_subject(
         SELECT u.id, u.display_name, u.created_at, u.is_admin, p.credential_hash
         FROM users u
         JOIN user_auth_providers p ON p.user_id = u.id
-        WHERE p.provider = 'password' AND p.subject = $1 AND p.credential_hash IS NOT NULL
+        WHERE p.provider = 'password' AND p.subject = ? AND p.credential_hash IS NOT NULL
         "#,
     )
     .bind(username)
@@ -76,7 +78,7 @@ pub async fn get_user_by_password_subject(
 }
 
 pub async fn get_user_by_oidc_subject(
-    pool: &PgPool,
+    pool: &SqlitePool,
     sub: &str,
 ) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
@@ -84,7 +86,7 @@ pub async fn get_user_by_oidc_subject(
         SELECT u.id, u.display_name, u.created_at, u.is_admin
         FROM users u
         JOIN user_auth_providers p ON p.user_id = u.id
-        WHERE p.provider = 'oidc' AND p.subject = $1
+        WHERE p.provider = 'oidc' AND p.subject = ?
         "#,
     )
     .bind(sub)
@@ -93,88 +95,100 @@ pub async fn get_user_by_oidc_subject(
 }
 
 /// Creates a new user and a `'password'` auth provider row in a single
-/// transaction. Returns a conflict error (propagated from the DB unique
-/// constraint on `(provider, subject)`) if the username is already taken.
-///
-/// Pass `is_admin: true` only for the bootstrap path; normal user creation
-/// always passes `false`.
+/// transaction. Returns a conflict error if the username is already taken.
 pub async fn create_user_with_password(
-    pool: &PgPool,
+    pool: &SqlitePool,
     display_name: &str,
     username: &str,
     credential_hash: &str,
     is_admin: bool,
 ) -> sqlx::Result<User> {
+    let user_id = Uuid::new_v4();
     let mut tx = pool.begin().await?;
 
-    let user = sqlx::query_as::<_, User>(
-        "INSERT INTO users (display_name, is_admin) VALUES ($1, $2) \
-         RETURNING id, display_name, created_at, is_admin",
+    sqlx::query(
+        "INSERT INTO users (id, display_name, is_admin) VALUES (?, ?, ?)",
     )
+    .bind(user_id)
     .bind(display_name)
     .bind(is_admin)
-    .fetch_one(&mut *tx)
+    .execute(&mut *tx)
     .await?;
 
     sqlx::query(
-        "INSERT INTO user_auth_providers (user_id, provider, subject, credential_hash) \
-         VALUES ($1, 'password', $2, $3)",
+        "INSERT INTO user_auth_providers (id, user_id, provider, subject, credential_hash) \
+         VALUES (?, ?, 'password', ?, ?)",
     )
-    .bind(user.id)
+    .bind(Uuid::new_v4())
+    .bind(user_id)
     .bind(username)
     .bind(credential_hash)
     .execute(&mut *tx)
     .await?;
 
     tx.commit().await?;
-    Ok(user)
+
+    // Fetch back to pick up the server-side created_at default.
+    sqlx::query_as::<_, User>(
+        "SELECT id, display_name, created_at, is_admin FROM users WHERE id = ?",
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
 }
 
 /// Creates a new user and an `'oidc'` auth provider row in a single
 /// transaction. Called during OIDC callback when no existing user matches the
 /// provider's `sub` claim (auto-provisioning).
 pub async fn create_user_with_oidc(
-    pool: &PgPool,
+    pool: &SqlitePool,
     display_name: &str,
     sub: &str,
 ) -> sqlx::Result<User> {
+    let user_id = Uuid::new_v4();
     let mut tx = pool.begin().await?;
 
-    let user = sqlx::query_as::<_, User>(
-        "INSERT INTO users (display_name) VALUES ($1) \
-         RETURNING id, display_name, created_at, is_admin",
+    sqlx::query(
+        "INSERT INTO users (id, display_name) VALUES (?, ?)",
     )
+    .bind(user_id)
     .bind(display_name)
-    .fetch_one(&mut *tx)
+    .execute(&mut *tx)
     .await?;
 
     sqlx::query(
-        "INSERT INTO user_auth_providers (user_id, provider, subject) VALUES ($1, 'oidc', $2)",
+        "INSERT INTO user_auth_providers (id, user_id, provider, subject) VALUES (?, ?, 'oidc', ?)",
     )
-    .bind(user.id)
+    .bind(Uuid::new_v4())
+    .bind(user_id)
     .bind(sub)
     .execute(&mut *tx)
     .await?;
 
     tx.commit().await?;
-    Ok(user)
+
+    sqlx::query_as::<_, User>(
+        "SELECT id, display_name, created_at, is_admin FROM users WHERE id = ?",
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
 }
 
 // --- Session queries ---
 
-/// Inserts a new session row and returns its UUID. The session ID is generated
-/// here rather than by the DB so the caller has it immediately without a
-/// round-trip to read the default value back.
+/// Inserts a new session and returns its UUID. Expiry is stored as a Unix
+/// timestamp so it can be compared directly with `unixepoch('now')`.
 pub async fn create_session(
-    pool: &PgPool,
+    pool: &SqlitePool,
     user_id: Uuid,
     duration: chrono::Duration,
 ) -> sqlx::Result<Uuid> {
     let session_id = Uuid::new_v4();
-    let expires_at = Utc::now() + duration;
+    let expires_at = (Utc::now() + duration).timestamp();
 
     sqlx::query(
-        "INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)",
+        "INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)",
     )
     .bind(session_id)
     .bind(user_id)
@@ -185,15 +199,15 @@ pub async fn create_session(
     Ok(session_id)
 }
 
-/// Resolves a session cookie value to a live user. Returns `None` if the
-/// session does not exist or has expired (`expires_at <= now()`).
-pub async fn get_session_user(pool: &PgPool, session_id: Uuid) -> sqlx::Result<Option<User>> {
+/// Resolves a session cookie to a live user. Returns `None` if the session
+/// does not exist or has expired.
+pub async fn get_session_user(pool: &SqlitePool, session_id: Uuid) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
         r#"
         SELECT u.id, u.display_name, u.created_at, u.is_admin
         FROM users u
         JOIN sessions s ON s.user_id = u.id
-        WHERE s.id = $1 AND s.expires_at > now()
+        WHERE s.id = ? AND s.expires_at > unixepoch('now')
         "#,
     )
     .bind(session_id)
@@ -201,18 +215,17 @@ pub async fn get_session_user(pool: &PgPool, session_id: Uuid) -> sqlx::Result<O
     .await
 }
 
-pub async fn delete_session(pool: &PgPool, session_id: Uuid) -> sqlx::Result<()> {
-    sqlx::query("DELETE FROM sessions WHERE id = $1")
+pub async fn delete_session(pool: &SqlitePool, session_id: Uuid) -> sqlx::Result<()> {
+    sqlx::query("DELETE FROM sessions WHERE id = ?")
         .bind(session_id)
         .execute(pool)
         .await?;
     Ok(())
 }
 
-/// Deletes all expired sessions in one shot. Called by the hourly background
-/// task; returns the number of rows removed for logging.
-pub async fn delete_expired_sessions(pool: &PgPool) -> sqlx::Result<u64> {
-    let r = sqlx::query("DELETE FROM sessions WHERE expires_at <= now()")
+/// Deletes all expired sessions. Returns the number of rows removed.
+pub async fn delete_expired_sessions(pool: &SqlitePool) -> sqlx::Result<u64> {
+    let r = sqlx::query("DELETE FROM sessions WHERE expires_at <= unixepoch('now')")
         .execute(pool)
         .await?;
     Ok(r.rows_affected())

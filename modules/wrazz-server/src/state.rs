@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use chrono::Duration;
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::routes::oidc::OidcProvider;
 use crate::store_cache::StoreCache;
@@ -9,13 +9,13 @@ use crate::store_cache::StoreCache;
 /// Shared server state injected into every Axum handler via [`State`].
 ///
 /// `AppState` is cheap to clone (all heavy resources are behind `Arc` or are
-/// themselves clone-by-reference like `PgPool`), so each handler receives its
-/// own copy rather than a shared reference.
+/// themselves clone-by-reference like `SqlitePool`), so each handler receives
+/// its own copy rather than a shared reference.
 ///
 /// [`State`]: axum::extract::State
 #[derive(Clone)]
 pub struct AppState {
-    pub pool: PgPool,
+    pub pool: SqlitePool,
     pub store_cache: Arc<StoreCache>,
     /// Root data directory. Per-user directories are `<data_dir>/<user_id>/`.
     pub data_dir: PathBuf,

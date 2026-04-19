@@ -9,7 +9,7 @@ use argon2::{
     Argon2, PasswordHasher,
     password_hash::{SaltString, rand_core::OsRng},
 };
-use sqlx::{PgPool, postgres::PgPoolOptions};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use state::AppState;
 
 #[tokio::main]
@@ -18,7 +18,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let data_dir: std::path::PathBuf =
         std::env::var("WRAZZ_DATA_DIR").unwrap_or_else(|_| "./data".into()).into();
     let bind = std::env::var("WRAZZ_BIND").unwrap_or_else(|_| "127.0.0.1:3001".into());
@@ -30,9 +29,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::fs::create_dir_all(&data_dir).await?;
 
-    let pool = PgPoolOptions::new()
+    let db_path = data_dir.join("db.sqlite");
+    let connect_opts = SqliteConnectOptions::new()
+        .filename(&db_path)
+        .create_if_missing(true)
+        .foreign_keys(true);
+
+    let pool = SqlitePoolOptions::new()
         .max_connections(5)
-        .connect(&database_url)
+        .connect_with(connect_opts)
         .await?;
 
     sqlx::migrate!("./migrations").run(&pool).await?;
@@ -79,10 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Creates the first admin account from `WRAZZ_BOOTSTRAP_ADMIN=username:password`
 /// if the env var is set and no admin users exist yet.
-///
-/// Errors are logged as warnings so a misconfigured bootstrap never prevents
-/// the server from starting.
-async fn maybe_bootstrap_admin(pool: &PgPool) {
+async fn maybe_bootstrap_admin(pool: &sqlx::SqlitePool) {
     let raw = match std::env::var("WRAZZ_BOOTSTRAP_ADMIN") {
         Ok(v) => v,
         Err(_) => return,
@@ -124,8 +126,6 @@ async fn maybe_bootstrap_admin(pool: &PgPool) {
 }
 
 /// Reads the four `WRAZZ_OIDC_*` env vars and runs provider discovery.
-/// Returns `None` quietly if any var is absent (password-only mode) or if
-/// discovery fails so the server can still start and serve password logins.
 async fn build_oidc_provider() -> Option<Arc<routes::oidc::OidcProvider>> {
     let issuer_url = std::env::var("WRAZZ_OIDC_ISSUER_URL").ok()?;
     let client_id = std::env::var("WRAZZ_OIDC_CLIENT_ID").ok()?;
