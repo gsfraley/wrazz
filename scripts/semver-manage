@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CARGO_TOML="$REPO_ROOT/Cargo.toml"
+PKG_JSON="$REPO_ROOT/modules/wrazz-frontend/package.json"
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+die() { echo "error: $*" >&2; exit 1; }
+
+read_cargo_version() {
+    # Match the version line inside [workspace.package] only — not member crate overrides.
+    awk '
+        /^\[workspace\.package\]/ { in_section=1; next }
+        /^\[/                      { in_section=0 }
+        in_section && /^version[[:space:]]*=/ {
+            match($0, /"([^"]+)"/, arr); print arr[1]; exit
+        }
+    ' "$CARGO_TOML"
+}
+
+read_pkg_version() {
+    # First "version" key in package.json (the package version, not an engine range).
+    awk -F'"' '/"version"[[:space:]]*:/ { print $4; exit }' "$PKG_JSON"
+}
+
+assert_synced() {
+    local cargo_ver pkg_ver
+    cargo_ver="$(read_cargo_version)"
+    pkg_ver="$(read_pkg_version)"
+    if [[ "$cargo_ver" != "$pkg_ver" ]]; then
+        die "versions are out of sync — Cargo.toml has '$cargo_ver', package.json has '$pkg_ver'. Fix manually before running this script."
+    fi
+    echo "$cargo_ver"
+}
+
+validate_semver() {
+    local v="$1"
+    if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        die "not a valid semver: '$v' (expected MAJOR.MINOR.PATCH)"
+    fi
+}
+
+write_cargo_version() {
+    local new_ver="$1"
+    # Replace the version line within [workspace.package].
+    awk -v new="$new_ver" '
+        /^\[workspace\.package\]/ { in_section=1 }
+        /^\[/ && !/^\[workspace\.package\]/ { in_section=0 }
+        in_section && /^version[[:space:]]*=/ {
+            sub(/"[^"]*"/, "\"" new "\"")
+        }
+        { print }
+    ' "$CARGO_TOML" > "${CARGO_TOML}.tmp" && mv "${CARGO_TOML}.tmp" "$CARGO_TOML"
+}
+
+write_pkg_version() {
+    local new_ver="$1"
+    # Replace the first "version": "..." in package.json.
+    awk -v new="$new_ver" '
+        !done && /"version"[[:space:]]*:/ {
+            sub(/"version"[[:space:]]*:[[:space:]]*"[^"]*"/, "\"version\": \"" new "\"")
+            done=1
+        }
+        { print }
+    ' "$PKG_JSON" > "${PKG_JSON}.tmp" && mv "${PKG_JSON}.tmp" "$PKG_JSON"
+}
+
+bump_part() {
+    local ver="$1" part="$2"
+    local major minor patch
+    IFS='.' read -r major minor patch <<< "$ver"
+    case "$part" in
+        major) echo "$((major + 1)).0.0" ;;
+        minor) echo "${major}.$((minor + 1)).0" ;;
+        patch) echo "${major}.${minor}.$((patch + 1))" ;;
+        *)     die "unknown bump part '$part' (expected major, minor, or patch)" ;;
+    esac
+}
+
+apply_version() {
+    local new_ver="$1"
+    validate_semver "$new_ver"
+    write_cargo_version "$new_ver"
+    write_pkg_version "$new_ver"
+    echo "set version $new_ver"
+    echo ""
+    echo "next steps:"
+    echo "  cargo check          # syncs Cargo.lock"
+    echo "  git add Cargo.toml Cargo.lock modules/wrazz-frontend/package.json"
+    echo "  git commit -m \"chore: bump version to $new_ver\""
+    echo "  git tag v$new_ver"
+    echo "  git push && git push origin v$new_ver"
+}
+
+# ---------------------------------------------------------------------------
+# Subcommands
+# ---------------------------------------------------------------------------
+
+cmd_set_version() {
+    [[ $# -eq 1 ]] || die "usage: semver-manage set-version <VERSION>"
+    local new_ver="$1"
+    validate_semver "$new_ver"
+    assert_synced > /dev/null   # fail fast if out of sync before we write anything
+    apply_version "$new_ver"
+}
+
+cmd_bump_version() {
+    [[ $# -eq 1 ]] || die "usage: semver-manage bump-version <major|minor|patch>"
+    local part="$1"
+    local current new_ver
+    current="$(assert_synced)"
+    new_ver="$(bump_part "$current" "$part")"
+    apply_version "$new_ver"
+}
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
+
+[[ $# -ge 1 ]] || die "usage: semver-manage <set-version|bump-version> [args...]"
+
+subcommand="$1"; shift
+case "$subcommand" in
+    set-version)  cmd_set_version "$@" ;;
+    bump-version) cmd_bump_version "$@" ;;
+    *)            die "unknown subcommand '$subcommand' (expected set-version or bump-version)" ;;
+esac
