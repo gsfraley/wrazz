@@ -1,6 +1,8 @@
+mod routes;
+
 use std::sync::Arc;
 
-use wrazz_backend::{Store, routes};
+use wrazz_backend::Store;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

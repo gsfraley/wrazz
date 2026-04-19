@@ -11,16 +11,19 @@ use serde::Deserialize;
 use tower_http::cors::CorsLayer;
 use wrazz_core::FileEntry;
 
-use crate::store::{Store, StoreError};
+use wrazz_backend::{Store, StoreError};
 
 pub fn router(store: Arc<Store>) -> Router {
-    Router::new()
-        .route("/api/files", get(list_files).post(create_file))
+    let files = Router::new()
+        .route("/files", get(list_files).post(create_file))
         .route(
-            "/api/files/{id}",
+            "/files/{id}",
             get(get_file).put(update_file).delete(delete_file),
         )
-        .with_state(store)
+        .with_state(store);
+
+    Router::new()
+        .nest("/api", files)
         // Permissive CORS for local development (Vite runs on a different port).
         // Tighten this before any public-facing deployment.
         .layer(CorsLayer::permissive())

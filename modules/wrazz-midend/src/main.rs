@@ -1,7 +1,9 @@
+mod routes;
+
 use std::sync::Arc;
 
 use wrazz_backend::{LocalBackend, Store};
-use wrazz_midend::{HttpBackend, routes};
+use wrazz_midend::HttpBackend;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
