@@ -1,14 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
 import { FileEntry, listFiles, createFile, updateFile, deleteFile } from "./api/files";
+import { CurrentUser, getCurrentUser, logout } from "./api/auth";
 import FileList from "./components/FileList";
 import Editor, { Draft } from "./components/Editor";
 import StatusBar from "./components/StatusBar";
+import LoginPage from "./components/LoginPage";
 
 export default function App() {
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+
+  // Probe the session once on mount.
+  useEffect(() => {
+    getCurrentUser()
+      .then((u) => setUser(u))
+      .finally(() => setAuthChecked(true));
+  }, []);
 
   const activeFile = files.find((f) => f.id === activeId) ?? null;
 
@@ -19,8 +31,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    reload();
-  }, [reload]);
+    if (user) reload();
+  }, [user, reload]);
 
   function handleSelect(id: string) {
     const file = files.find((f) => f.id === id);
@@ -57,6 +69,21 @@ export default function App() {
     setStatus("Deleted");
   }
 
+  async function handleLogout() {
+    await logout();
+    setUser(null);
+    setFiles([]);
+    setActiveId(null);
+    setDraft(null);
+    setStatus(null);
+  }
+
+  if (!authChecked) return null;
+
+  if (!user) {
+    return <LoginPage onLogin={setUser} />;
+  }
+
   return (
     <div className="app">
       <div className="workspace">
@@ -65,6 +92,7 @@ export default function App() {
           activeId={activeId}
           onSelect={handleSelect}
           onNew={handleNew}
+          onLogout={handleLogout}
         />
         <Editor
           file={activeFile}
