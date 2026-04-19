@@ -1,0 +1,14 @@
+# Compiled output — can be many gigabytes and is fully rebuilt inside Docker.
+/target/
+
+# Frontend build output and dependencies.
+/modules/wrazz-frontend/dist/
+/modules/wrazz-frontend/node_modules/
+
+# Git history isn't needed in the build context.
+/.git/
+
+# Editor and OS noise.
+.DS_Store
+*.swp
+*.swo
