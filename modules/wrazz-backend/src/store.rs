@@ -5,17 +5,22 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 use wrazz_core::FileEntry;
 
+/// Errors that can arise from [`Store`] operations.
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
+    /// The requested file does not exist under the data directory.
     #[error("not found: {id}")]
     NotFound { id: String },
 
+    /// Slug collision: every candidate filename up to the 9999-suffix cap is
+    /// already taken. In practice this requires ~10k identically-titled files.
     #[error("conflict: {id} already exists")]
     Conflict { id: String },
 
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// The YAML front matter block could not be parsed.
     #[error("front matter parse error in {file}: {message}")]
     Parse { file: String, message: String },
 }
@@ -44,11 +49,36 @@ fn slice_is_empty(v: &[String]) -> bool {
     v.is_empty()
 }
 
+/// Low-level file I/O layer for a single directory of Markdown notes.
+///
+/// A `Store` manages one flat-or-nested tree of `.md` files rooted at
+/// `data_dir`. Files use YAML front matter for metadata:
+///
+/// ```text
+/// ---
+/// title: Morning Pages
+/// tags: [journal]
+/// created_at: 2026-04-01T07:00:00Z
+/// ---
+///
+/// Body content here.
+/// ```
+///
+/// Files without front matter are accepted as "naked" files: the title is
+/// taken from the first `# Heading` line if present, or falls back to the
+/// filename stem.
+///
+/// `Store` is not aware of users. For multi-user deployments, `wrazz-server`
+/// creates one `Store` per user, each pointed at a separate subdirectory.
 pub struct Store {
     data_dir: PathBuf,
 }
 
 impl Store {
+    /// Creates a new `Store` rooted at `data_dir`.
+    ///
+    /// The directory is not created here — callers are responsible for
+    /// ensuring it exists before the first operation.
     pub fn new(data_dir: impl Into<PathBuf>) -> Self {
         Self {
             data_dir: data_dir.into(),
@@ -59,6 +89,9 @@ impl Store {
         self.data_dir.join(id)
     }
 
+    /// Returns all `.md` files under the data directory, sorted
+    /// case-insensitively by ID (i.e. by relative path). Files that fail to
+    /// parse are skipped with a warning rather than aborting the listing.
     pub async fn list(&self) -> StoreResult<Vec<FileEntry>> {
         let data_dir = self.data_dir.clone();
 
@@ -98,6 +131,7 @@ impl Store {
         Ok(entries)
     }
 
+    /// Reads and parses the file at `id`, returning a [`FileEntry`].
     pub async fn load(&self, id: &str) -> StoreResult<FileEntry> {
         let path = self.full_path(id);
 
@@ -181,6 +215,8 @@ impl Store {
         format!("---\n{yaml}---\n\n{content}")
     }
 
+    /// Creates a new file. The filename is derived by [`slugify`]-ing the
+    /// title; if that slug is taken a numeric suffix is tried up to `-9999`.
     pub async fn create(
         &self,
         title: String,
@@ -225,6 +261,8 @@ impl Store {
         })
     }
 
+    /// Overwrites the content of an existing file, preserving its original
+    /// `created_at` timestamp.
     pub async fn save(
         &self,
         id: &str,
@@ -246,6 +284,7 @@ impl Store {
         self.load(id).await
     }
 
+    /// Deletes the file at `id` from the filesystem.
     pub async fn delete(&self, id: &str) -> StoreResult<()> {
         fs::remove_file(self.full_path(id)).await.map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
@@ -258,7 +297,15 @@ impl Store {
 }
 
 /// Converts a title into a URL-safe filename stem.
-/// "Evening Thoughts!" → "evening-thoughts"
+///
+/// Non-alphanumeric characters are replaced with hyphens, consecutive hyphens
+/// are collapsed, and leading/trailing hyphens are removed.
+///
+/// ```
+/// # use wrazz_backend::slugify;
+/// assert_eq!(slugify("Evening Thoughts!"), "evening-thoughts");
+/// assert_eq!(slugify("  -- hello --  "), "hello");
+/// ```
 pub fn slugify(s: &str) -> String {
     s.to_lowercase()
         .chars()
@@ -270,7 +317,7 @@ pub fn slugify(s: &str) -> String {
         .join("-")
 }
 
-/// Returns the filename stem from an ID like "journal/april.md" → "april".
+/// Returns the filename stem from an ID like `"journal/april.md"` → `"april"`.
 fn stem_from_id(id: &str) -> String {
     Path::new(id)
         .file_stem()

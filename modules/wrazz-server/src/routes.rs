@@ -1,3 +1,6 @@
+/// Assembles the full Axum router: auth routes under `/api/auth/` and
+/// user-scoped file CRUD under `/api/files/`. All file handlers require a
+/// valid session via the [`AuthUser`] extractor; auth routes are open.
 use axum::{
     Json, Router,
     extract::{Path, State},

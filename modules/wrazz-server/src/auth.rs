@@ -11,14 +11,18 @@ use wrazz_server::User;
 use crate::db;
 use crate::state::AppState;
 
+/// Name of the session cookie set on login and cleared on logout.
 pub const SESSION_COOKIE: &str = "wrazz_session";
 
-// --- AuthUser extractor ---
-//
-// Pulls the session cookie from the request, validates it against the DB,
-// and produces the authenticated User. Any route that requires login takes
-// this as a parameter; unauthenticated requests are rejected at extraction time.
-
+/// Axum extractor that authenticates the current request.
+///
+/// Reads the [`SESSION_COOKIE`] from the request headers, parses it as a
+/// UUID, and resolves it against the `sessions` table. If the session exists
+/// and hasn't expired, the associated [`User`] is returned.
+///
+/// Any handler that requires authentication simply declares `auth_user:
+/// AuthUser` as a parameter. Unauthenticated or expired requests are rejected
+/// with `401 Unauthorized` before the handler body runs.
 pub struct AuthUser(pub User);
 
 impl<S> axum::extract::FromRequestParts<S> for AuthUser
@@ -70,6 +74,9 @@ pub struct LoginRequest {
 
 // --- Handlers ---
 
+/// `POST /api/auth/register` — creates a new password-auth account.
+///
+/// Returns `409 Conflict` if the username is already taken.
 pub async fn register(
     State(state): State<AppState>,
     Json(req): Json<RegisterRequest>,
@@ -95,6 +102,10 @@ pub async fn register(
     Ok((StatusCode::CREATED, Json(user)))
 }
 
+/// `POST /api/auth/login` — verifies credentials and sets a session cookie.
+///
+/// The same generic `401` is returned for both "user not found" and "wrong
+/// password" to avoid leaking whether a username exists.
 pub async fn login(
     jar: CookieJar,
     State(state): State<AppState>,
@@ -125,6 +136,9 @@ pub async fn login(
     Ok((jar.add(cookie), StatusCode::OK))
 }
 
+/// `POST /api/auth/logout` — deletes the session from the DB and clears the cookie.
+///
+/// Always succeeds, even if the session cookie is absent or already expired.
 pub async fn logout(
     jar: CookieJar,
     State(state): State<AppState>,
@@ -138,6 +152,7 @@ pub async fn logout(
     (jar.remove(removal), StatusCode::NO_CONTENT)
 }
 
+/// `GET /api/auth/me` — returns the currently authenticated user.
 pub async fn me(auth_user: AuthUser) -> Json<User> {
     Json(auth_user.0)
 }

@@ -2,12 +2,23 @@ use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
 use wrazz_core::{Backend, BackendError, BackendResult, FileEntry};
 
+/// [`Backend`] implementation that proxies all operations to a remote
+/// `wrazz-server` over HTTP.
+///
+/// Used when `WRAZZ_BACKEND_URL` is set and `wrazz-backend` is acting as a
+/// BFF in front of a separate server process rather than touching the
+/// filesystem directly.
 pub struct HttpBackend {
     base_url: String,
     client: Client,
 }
 
 impl HttpBackend {
+    /// Creates a new `HttpBackend` targeting `base_url`.
+    ///
+    /// `base_url` should be the scheme + host + optional port with no trailing
+    /// slash — e.g. `"http://localhost:3001"`. The `/api/files` path is
+    /// appended internally.
     pub fn new(base_url: impl Into<String>) -> Self {
         Self {
             base_url: base_url.into(),

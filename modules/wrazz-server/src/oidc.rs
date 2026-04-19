@@ -24,22 +24,41 @@ use crate::auth::SESSION_COOKIE;
 use crate::db;
 use crate::state::AppState;
 
-// How long OIDC state is kept before we consider it abandoned.
+/// How long in-flight OIDC authorizations are kept before being discarded.
+/// If a user starts a login but never completes the callback within this
+/// window, the pending state is cleaned up on the next redirect request.
 const PENDING_TTL: Duration = Duration::from_secs(600);
 
+/// Per-flight OIDC state kept between the redirect and the callback.
+///
+/// The nonce is embedded in the authorization request and verified against
+/// the returned ID token to prevent replay attacks. The PKCE verifier
+/// completes the code exchange and ensures the authorization code is only
+/// usable by the party that initiated the flow.
 struct PendingAuth {
     nonce: Nonce,
     pkce_verifier: PkceCodeVerifier,
     created_at: Instant,
 }
 
+/// Holds the configured OIDC client and in-flight authorization state.
+///
+/// Created once at startup via [`OidcProvider::discover`], then stored as
+/// `Arc<OidcProvider>` in [`AppState`]. The `pending` map is keyed by CSRF
+/// token value (the `state` query parameter) and entries are one-time-use:
+/// the callback handler removes the entry before processing it.
 pub struct OidcProvider {
     client: CoreClient,
     pending: RwLock<HashMap<String, PendingAuth>>,
 }
 
 impl OidcProvider {
-    /// Discovers the OIDC provider metadata and builds the client.
+    /// Runs OpenID Connect discovery against `issuer_url` to fetch provider
+    /// metadata, then builds and returns a configured client.
+    ///
+    /// Called once at startup. If discovery fails (provider unreachable,
+    /// misconfigured URL, etc.) the error is logged and the server starts
+    /// without OIDC rather than refusing to boot.
     pub async fn discover(
         issuer_url: String,
         client_id: String,
@@ -65,12 +84,12 @@ impl OidcProvider {
         })
     }
 
+    /// Removes entries older than [`PENDING_TTL`] from the pending map.
+    /// Must be called while holding the write lock.
     fn evict_stale(pending: &mut HashMap<String, PendingAuth>) {
         pending.retain(|_, v| v.created_at.elapsed() < PENDING_TTL);
     }
 }
-
-// --- Query params ---
 
 #[derive(Deserialize)]
 pub struct CallbackParams {
@@ -78,8 +97,11 @@ pub struct CallbackParams {
     state: String,
 }
 
-// --- Handlers ---
-
+/// `GET /api/auth/oidc/redirect` — begins the authorization code flow.
+///
+/// Generates a fresh CSRF token, nonce, and PKCE challenge, stores the
+/// verifier material in the pending map, then redirects the browser to the
+/// provider's authorization endpoint.
 pub async fn oidc_redirect(
     State(state): State<AppState>,
 ) -> Result<Redirect, (StatusCode, &'static str)> {
@@ -115,6 +137,16 @@ pub async fn oidc_redirect(
     Ok(Redirect::to(auth_url.as_str()))
 }
 
+/// `GET /api/auth/oidc/callback` — completes the authorization code flow.
+///
+/// Verifies the CSRF `state` parameter, exchanges the code for tokens,
+/// validates the ID token signature and nonce, then finds or creates a user
+/// matching the provider's `sub` claim. On success, sets a session cookie and
+/// redirects to `/`.
+///
+/// New users are auto-provisioned: if no account with this OIDC subject
+/// exists, one is created using `preferred_username` (or `sub` as fallback)
+/// as the display name.
 pub async fn oidc_callback(
     jar: CookieJar,
     State(state): State<AppState>,

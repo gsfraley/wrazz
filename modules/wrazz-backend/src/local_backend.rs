@@ -13,6 +13,12 @@ impl From<StoreError> for BackendError {
     }
 }
 
+/// [`Backend`] implementation that reads and writes files directly on the
+/// local filesystem via a [`Store`].
+///
+/// This is used when `wrazz-backend` runs in standalone mode (no
+/// `WRAZZ_BACKEND_URL` set). `wrazz-server` also uses [`Store`] directly
+/// for per-user file trees, bypassing this wrapper.
 pub struct LocalBackend {
     store: Store,
 }

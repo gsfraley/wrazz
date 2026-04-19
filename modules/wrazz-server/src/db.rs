@@ -1,3 +1,9 @@
+//! Database query functions.
+//!
+//! All queries use the runtime `sqlx::query_as` API rather than the
+//! compile-time `query!` macros, so no `DATABASE_URL` is required at build
+//! time. Type correctness is checked at runtime on first execution instead.
+
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -24,7 +30,9 @@ pub async fn get_user_by_id(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<User
     .await
 }
 
-/// Returns `(user, credential_hash)` for password authentication.
+/// Looks up a user by their password login username and returns the user
+/// together with their stored argon2 hash, so the caller can verify the
+/// supplied password before creating a session.
 pub async fn get_user_by_password_subject(
     pool: &PgPool,
     username: &str,
@@ -72,6 +80,9 @@ pub async fn get_user_by_oidc_subject(
     .await
 }
 
+/// Creates a new user and a `'password'` auth provider row in a single
+/// transaction. Returns a conflict error (propagated from the DB unique
+/// constraint on `(provider, subject)`) if the username is already taken.
 pub async fn create_user_with_password(
     pool: &PgPool,
     display_name: &str,
@@ -101,6 +112,9 @@ pub async fn create_user_with_password(
     Ok(user)
 }
 
+/// Creates a new user and an `'oidc'` auth provider row in a single
+/// transaction. Called during OIDC callback when no existing user matches the
+/// provider's `sub` claim (auto-provisioning).
 pub async fn create_user_with_oidc(
     pool: &PgPool,
     display_name: &str,
@@ -129,6 +143,9 @@ pub async fn create_user_with_oidc(
 
 // --- Session queries ---
 
+/// Inserts a new session row and returns its UUID. The session ID is generated
+/// here rather than by the DB so the caller has it immediately without a
+/// round-trip to read the default value back.
 pub async fn create_session(
     pool: &PgPool,
     user_id: Uuid,
@@ -149,6 +166,8 @@ pub async fn create_session(
     Ok(session_id)
 }
 
+/// Resolves a session cookie value to a live user. Returns `None` if the
+/// session does not exist or has expired (`expires_at <= now()`).
 pub async fn get_session_user(pool: &PgPool, session_id: Uuid) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
         r#"
@@ -171,6 +190,8 @@ pub async fn delete_session(pool: &PgPool, session_id: Uuid) -> sqlx::Result<()>
     Ok(())
 }
 
+/// Deletes all expired sessions in one shot. Called by the hourly background
+/// task; returns the number of rows removed for logging.
 pub async fn delete_expired_sessions(pool: &PgPool) -> sqlx::Result<u64> {
     let r = sqlx::query("DELETE FROM sessions WHERE expires_at <= now()")
         .execute(pool)

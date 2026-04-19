@@ -72,8 +72,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Reads OIDC env vars and runs provider discovery. Returns `None` if any var
-/// is missing or discovery fails (server still starts without OIDC).
+/// Reads the four `WRAZZ_OIDC_*` env vars and runs provider discovery.
+/// Returns `None` quietly if any var is absent (password-only mode) or if
+/// discovery fails so the server can still start and serve password logins.
 async fn build_oidc_provider() -> Option<Arc<oidc::OidcProvider>> {
     let issuer_url = std::env::var("WRAZZ_OIDC_ISSUER_URL").ok()?;
     let client_id = std::env::var("WRAZZ_OIDC_CLIENT_ID").ok()?;
