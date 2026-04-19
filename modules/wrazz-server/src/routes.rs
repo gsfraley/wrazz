@@ -9,16 +9,18 @@ use axum::{
 };
 use serde::Deserialize;
 use tower_http::cors::CorsLayer;
-use wrazz_core::{Backend, BackendError, FileEntry};
+use wrazz_core::FileEntry;
 
-pub fn router(backend: Arc<dyn Backend>) -> Router {
+use wrazz_backend::{Store, StoreError};
+
+pub fn router(store: Arc<Store>) -> Router {
     let files = Router::new()
         .route("/files", get(list_files).post(create_file))
         .route(
             "/files/{id}",
             get(get_file).put(update_file).delete(delete_file),
         )
-        .with_state(backend);
+        .with_state(store);
 
     Router::new()
         .nest("/api", files)
@@ -29,21 +31,21 @@ pub fn router(backend: Arc<dyn Backend>) -> Router {
 
 // --- Error mapping ---
 
-struct ApiError(BackendError);
+struct ApiError(StoreError);
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let status = match &self.0 {
-            BackendError::NotFound(_) => StatusCode::NOT_FOUND,
-            BackendError::Conflict(_) => StatusCode::CONFLICT,
-            BackendError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            StoreError::NotFound { .. } => StatusCode::NOT_FOUND,
+            StoreError::Conflict { .. } => StatusCode::CONFLICT,
+            StoreError::Io(_) | StoreError::Parse { .. } => StatusCode::INTERNAL_SERVER_ERROR,
         };
         (status, self.0.to_string()).into_response()
     }
 }
 
-impl From<BackendError> for ApiError {
-    fn from(e: BackendError) -> Self {
+impl From<StoreError> for ApiError {
+    fn from(e: StoreError) -> Self {
         Self(e)
     }
 }
@@ -68,45 +70,39 @@ struct UpdateRequest {
 
 // --- Handlers ---
 
-async fn list_files(
-    State(backend): State<Arc<dyn Backend>>,
-) -> Result<Json<Vec<FileEntry>>, ApiError> {
-    Ok(Json(backend.list_files().await?))
+async fn list_files(State(store): State<Arc<Store>>) -> Result<Json<Vec<FileEntry>>, ApiError> {
+    Ok(Json(store.list().await?))
 }
 
 async fn get_file(
-    State(backend): State<Arc<dyn Backend>>,
+    State(store): State<Arc<Store>>,
     Path(id): Path<String>,
 ) -> Result<Json<FileEntry>, ApiError> {
-    Ok(Json(backend.get_file(&id).await?))
+    Ok(Json(store.load(&id).await?))
 }
 
 async fn create_file(
-    State(backend): State<Arc<dyn Backend>>,
+    State(store): State<Arc<Store>>,
     Json(req): Json<CreateRequest>,
 ) -> Result<(StatusCode, Json<FileEntry>), ApiError> {
-    let entry = backend
-        .create_file(req.title, req.content, req.tags)
-        .await?;
+    let entry = store.create(req.title, req.content, req.tags).await?;
     Ok((StatusCode::CREATED, Json(entry)))
 }
 
 async fn update_file(
-    State(backend): State<Arc<dyn Backend>>,
+    State(store): State<Arc<Store>>,
     Path(id): Path<String>,
     Json(req): Json<UpdateRequest>,
 ) -> Result<Json<FileEntry>, ApiError> {
     Ok(Json(
-        backend
-            .update_file(&id, req.title, req.content, req.tags)
-            .await?,
+        store.save(&id, req.title, req.content, req.tags).await?,
     ))
 }
 
 async fn delete_file(
-    State(backend): State<Arc<dyn Backend>>,
+    State(store): State<Arc<Store>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    backend.delete_file(&id).await?;
+    store.delete(&id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

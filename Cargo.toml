@@ -1,8 +1,8 @@
 [workspace]
 members = [
     "modules/wrazz-core",
-    "modules/wrazz-midend",
     "modules/wrazz-backend",
+    "modules/wrazz-server",
 ]
 resolver = "2"
 
