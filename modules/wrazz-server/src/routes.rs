@@ -9,7 +9,7 @@ use axum::{
     routing::{get, post},
 };
 use serde::Deserialize;
-use tower_http::cors::CorsLayer;
+use tower_http::{cors::CorsLayer, services::{ServeDir, ServeFile}};
 use wrazz_backend::StoreError;
 use wrazz_core::FileEntry;
 
@@ -17,7 +17,10 @@ use crate::auth::{self, AuthUser};
 use crate::oidc;
 use crate::state::AppState;
 
-pub fn router(state: AppState) -> Router {
+/// `static_dir` is the path to the built frontend assets. When `Some`, all
+/// requests that don't match an API route fall through to `ServeDir`, with
+/// `index.html` as the fallback so client-side routing works correctly.
+pub fn router(state: AppState, static_dir: Option<String>) -> Router {
     let auth_routes = Router::new()
         .route("/register", post(auth::register))
         .route("/login", post(auth::login))
@@ -34,10 +37,17 @@ pub fn router(state: AppState) -> Router {
         .nest("/auth", auth_routes)
         .merge(file_routes);
 
-    Router::new()
+    let base = Router::new()
         .nest("/api", api)
         .layer(CorsLayer::permissive())
-        .with_state(state)
+        .with_state(state);
+
+    match static_dir {
+        Some(dir) => base.fallback_service(
+            ServeDir::new(&dir).fallback(ServeFile::new(format!("{dir}/index.html"))),
+        ),
+        None => base,
+    }
 }
 
 // --- Error type ---

@@ -20,6 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let data_dir: std::path::PathBuf =
         std::env::var("WRAZZ_DATA_DIR").unwrap_or_else(|_| "./data".into()).into();
     let bind = std::env::var("WRAZZ_BIND").unwrap_or_else(|_| "127.0.0.1:3001".into());
+    let static_dir = std::env::var("WRAZZ_STATIC_DIR").ok();
     let session_hours: i64 = std::env::var("WRAZZ_SESSION_HOURS")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -64,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    let app = routes::router(state);
+    let app = routes::router(state, static_dir);
     let listener = tokio::net::TcpListener::bind(&bind).await?;
     tracing::info!("listening on http://{bind}");
     axum::serve(listener, app).await?;

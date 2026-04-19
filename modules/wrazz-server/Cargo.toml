@@ -26,7 +26,7 @@ async-trait = { workspace = true }
 uuid = { workspace = true }
 axum = { workspace = true }
 axum-extra = { version = "0.10", features = ["cookie"] }
-tower-http = { workspace = true }
+tower-http = { workspace = true, features = ["fs"] }
 tracing-subscriber = { workspace = true }
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "migrate"] }
 argon2 = "0.5"
