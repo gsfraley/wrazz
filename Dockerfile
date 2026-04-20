@@ -4,6 +4,7 @@ FROM node:22-slim AS frontend
 WORKDIR /app/frontend
 COPY modules/wrazz-frontend/package.json modules/wrazz-frontend/yarn.lock ./
 RUN yarn install --frozen-lockfile
+COPY modules/wrazz-editor/ /app/wrazz-editor/
 COPY modules/wrazz-frontend/ .
 RUN yarn build
 
