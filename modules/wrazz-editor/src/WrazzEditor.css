@@ -173,21 +173,6 @@
   color: var(--we-ink);
 }
 
-/* Hint line: rendered link text + URL, shown below the source/input */
-.we-link-overlay-hint {
-  margin-top: 3px;
-  padding-top: 3px;
-  border-top: 1px solid #ede8dc;
-  font-family: Georgia, serif;
-  font-size: 11px;
-  color: var(--we-ink-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* .we-link-text inside hint picks up the link color from its global rule */
-
 .we-link-overlay-url {
   color: var(--we-link-url);
   font-size: 0.9em;

@@ -1,32 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 
-// ── Link source parser ─────────────────────────────────────────
-
-interface ParsedLink {
-  text: string;
-  url: string;
-}
-
-function parseLink(src: string): ParsedLink {
-  const m = src.match(/^\[([^\]\n]*)\](?:\(([^)\n]*)\))?$/);
-  return { text: m?.[1] ?? "", url: m?.[2] ?? "" };
-}
-
 // ── Styled source display ──────────────────────────────────────
 // Renders [text](url) with the same per-part coloring as the inline editor.
+// Mirrors the logic in renderProgressLink() so partial states work correctly.
 
 function StyledSource({ src }: { src: string }) {
-  const m = src.match(/^(\[)([^\]]*?)(\](?:\()?)([^)]*)(\)?)?$/);
+  const m = src.match(/^\[([^\]]*)\]?(?:\(([^)]*)?)?$/);
   if (!m) return <span className="we-link-overlay-raw">{src}</span>;
 
-  const [, open, text, mid, url, close] = m;
+  const text = m[1] ?? "";
+  const hasCloseBracket = src.includes("]");
+  const hasOpenParen = src.includes("](");
+  const urlPart = hasOpenParen ? (m[2] ?? "") : null;
+  const hasCloseParen = src.endsWith(")");
+
   return (
     <>
-      {open && <span className="we-mark">{open}</span>}
+      <span className="we-mark">[</span>
       {text && <span className="we-link-text">{text}</span>}
-      {mid && <span className="we-mark">{mid}</span>}
-      {url && <span className="we-link-url-progress">{url}</span>}
-      {close && <span className="we-mark">{close}</span>}
+      {hasCloseBracket && !hasOpenParen && <span className="we-mark">]</span>}
+      {hasOpenParen && <span className="we-mark">](</span>}
+      {urlPart !== null && (
+        <span className="we-link-url-progress">{urlPart}</span>
+      )}
+      {hasCloseParen && <span className="we-mark">)</span>}
     </>
   );
 }
@@ -102,20 +99,18 @@ export function LinkOverlay({
   const top = anchorRect.top - wrapRect.top - 6;
   const left = Math.max(8, anchorRect.left - wrapRect.left);
 
-  const { text: parsedText, url: parsedUrl } = parseLink(
-    isEditing ? editSrc : source
-  );
-
   return (
     <div
       className="we-link-overlay"
       style={{ top, left, transform: "translateY(-100%)" }}
-      // Prevent mousedown from moving the editor's selection before focus
-      // transfers to the input. Without this the selectionchange fires while
-      // activeElement is still the editor, detectOverlay() runs, and closes
-      // the overlay before the click completes.
+      // Always prevent default on mousedown so the editor's selection never
+      // changes before focus transfers. We then manually focus the input so
+      // it still receives keyboard input. Without this, selectionchange fires
+      // while activeElement is still the editor, detectOverlay() finds no link
+      // under the (now-moved) selection, and the overlay self-dismisses.
       onMouseDown={(e) => {
-        if (e.target !== inputRef.current) e.preventDefault();
+        e.preventDefault();
+        if (isEditing) inputRef.current?.focus();
       }}
     >
       {isEditing ? (
@@ -132,16 +127,6 @@ export function LinkOverlay({
       ) : (
         <div className="we-link-overlay-source">
           <StyledSource src={source} />
-        </div>
-      )}
-
-      {/* Dim hint showing the rendered link text + URL when we have enough. */}
-      {(parsedText || parsedUrl) && (
-        <div className="we-link-overlay-hint">
-          {parsedText && <span className="we-link-text">{parsedText}</span>}
-          {parsedUrl && (
-            <span className="we-link-overlay-url"> {parsedUrl}</span>
-          )}
         </div>
       )}
     </div>
