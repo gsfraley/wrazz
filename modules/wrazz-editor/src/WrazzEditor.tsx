@@ -118,6 +118,10 @@ export function WrazzEditor({
   const wrapRef = useRef<HTMLDivElement>(null);
   const isComposing = useRef(false);
   const renderedValue = useRef<string | null>(null);
+  // Set true for a short window when the user mousedowns inside the overlay so
+  // the selectionchange handler doesn't dismiss the overlay while focus is
+  // transferring from the editor to the overlay input.
+  const overlayInteracting = useRef(false);
 
   const [overlay, setOverlay] = useState<OverlayState | null>(null);
 
@@ -191,21 +195,24 @@ export function WrazzEditor({
     // Don't touch caret for external changes (file switch, etc.)
   }, [value]);
 
-  // ── selectionchange: detect cursor moving into a link ───────
-  // Guard: if focus is inside the overlay (e.g. the edit input), do nothing.
-  // The overlay's onMouseDown prevents the editor selection from moving before
-  // focus transfers, so we only need to guard the focus-already-moved case.
+  // ── selectionchange: detect cursor moving into/out of a link ─
 
   useEffect(() => {
     const onSelectionChange = () => {
       const el = editorRef.current;
       const wrap = wrapRef.current;
       if (!el) return;
-      // If focus left the editor but stayed inside the wrap (= overlay input),
-      // leave the overlay alone.
+
+      // The user just mousedown'd inside the overlay; focus is mid-transfer
+      // from editor to overlay input. React's onMouseDown fires via bubble-
+      // phase delegation, which is too late to prevent the browser's default
+      // selection processing. So we use this flag to ignore the event window.
+      if (overlayInteracting.current) return;
+
       if (document.activeElement !== el) {
+        // If focus moved to the overlay input (still inside wrap), leave it.
         if (wrap && wrap.contains(document.activeElement)) return;
-        // Focus left entirely — dismiss.
+        // Focus left the component entirely — dismiss.
         setOverlay(null);
         return;
       }
@@ -272,6 +279,15 @@ export function WrazzEditor({
     editorRef.current?.focus();
   };
 
+  const handleOverlayInteractionStart = () => {
+    overlayInteracting.current = true;
+    // 200ms is well beyond the focus-transfer window; reset so normal
+    // selectionchange handling resumes once the input has focus.
+    setTimeout(() => {
+      overlayInteracting.current = false;
+    }, 200);
+  };
+
   const handleLinkNavigate = (direction: -1 | 1) => {
     const el = editorRef.current;
     const currentLine = overlay?.line ?? 0;
@@ -321,6 +337,7 @@ export function WrazzEditor({
           onChange={handleLinkChange}
           onDismiss={handleOverlayDismiss}
           onNavigate={handleLinkNavigate}
+          onInteractionStart={handleOverlayInteractionStart}
         />
       )}
     </div>

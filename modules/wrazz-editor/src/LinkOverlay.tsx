@@ -42,6 +42,11 @@ export interface LinkOverlayProps {
   onDismiss: () => void;
   /** Called with -1 (up) or +1 (down) when arrow keys are pressed in the overlay. */
   onNavigate: (direction: -1 | 1) => void;
+  /**
+   * Called on every mousedown inside the overlay — lets the parent suppress
+   * selectionchange dismissal while focus transfers from editor to overlay input.
+   */
+  onInteractionStart: () => void;
 }
 
 export function LinkOverlay({
@@ -52,6 +57,7 @@ export function LinkOverlay({
   onChange,
   onDismiss,
   onNavigate,
+  onInteractionStart,
 }: LinkOverlayProps) {
   const [editSrc, setEditSrc] = useState(source);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,15 +109,13 @@ export function LinkOverlay({
     <div
       className="we-link-overlay"
       style={{ top, left, transform: "translateY(-100%)" }}
-      // Always prevent default on mousedown so the editor's selection never
-      // changes before focus transfers. We then manually focus the input so
-      // it still receives keyboard input. Without this, selectionchange fires
-      // while activeElement is still the editor, detectOverlay() finds no link
-      // under the (now-moved) selection, and the overlay self-dismisses.
-      onMouseDown={(e) => {
-        e.preventDefault();
-        if (isEditing) inputRef.current?.focus();
-      }}
+      // Signal the parent before the browser moves focus so the selectionchange
+      // handler knows to ignore the next event window. We do NOT preventDefault
+      // here — that would prevent the input from receiving focus naturally, and
+      // React's synthetic onMouseDown runs via event delegation (bubble phase)
+      // which is already too late to prevent the browser's default selection
+      // processing anyway.
+      onMouseDown={onInteractionStart}
     >
       {isEditing ? (
         <input
