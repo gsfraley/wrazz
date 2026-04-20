@@ -5,18 +5,14 @@ interface Props {
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
-  onLogout: () => void;
 }
 
-export default function FileList({ files, activeId, onSelect, onNew, onLogout }: Props) {
+export default function FileList({ files, activeId, onSelect, onNew }: Props) {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
         <span className="sidebar-heading">Files</span>
-        <div className="sidebar-header-actions">
-          <button onClick={onNew}>+ New</button>
-          <button onClick={onLogout}>sign out</button>
-        </div>
+        <button onClick={onNew}>+ New</button>
       </div>
       <ul className="file-list">
         {files.map((f) => (

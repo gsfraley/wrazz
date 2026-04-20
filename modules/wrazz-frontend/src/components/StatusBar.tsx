@@ -1,13 +1,17 @@
+import { AppStatus } from "../types";
+
 interface Props {
-  activeId: string | null;
-  message: string | null;
+  title: string | null;
+  status: AppStatus | null;
 }
 
-export default function StatusBar({ activeId, message }: Props) {
+export default function StatusBar({ title, status }: Props) {
   return (
     <footer className="status-bar">
-      <span>{message ?? ""}</span>
-      <span>{activeId ?? ""}</span>
+      <span className={status?.kind === "error" ? "status-error" : ""}>
+        {status?.message ?? ""}
+      </span>
+      <span>{title ?? ""}</span>
     </footer>
   );
 }

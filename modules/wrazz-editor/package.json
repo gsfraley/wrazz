@@ -1,0 +1,29 @@
+{
+  "name": "wrazz-editor",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Embeddable source-mode Markdown editor with paper-feel typography",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./style.css": "./dist/index.css"
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.7.0",
+    "vite": "^6.3.1",
+    "vite-plugin-dts": "^4.0.0"
+  }
+}
