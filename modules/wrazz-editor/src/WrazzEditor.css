@@ -144,21 +144,26 @@
   background: #faf8f4;
   border: 1px solid #ddd8cc;
   border-radius: 5px;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
-  padding: 6px 10px;
-  min-width: 220px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.10);
+  padding: 5px 10px;
+  min-width: 200px;
   max-width: 480px;
   font-family: "Fira Mono", "Consolas", monospace;
   font-size: 12px;
+  line-height: 1.5;
 }
 
+/* Source line — styled like inline progress rendering */
 .we-link-overlay-source {
-  color: var(--we-ink-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* The .we-mark, .we-link-text, .we-link-url-progress classes from the main
+   editor apply here too since they're defined globally. */
+
+/* Edit mode input */
 .we-link-overlay-input {
   width: 100%;
   border: none;
@@ -168,33 +173,22 @@
   color: var(--we-ink);
 }
 
-.we-link-overlay-preview {
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px solid #e8e3d8;
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
+/* Hint line: rendered link text + URL, shown below the source/input */
+.we-link-overlay-hint {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid #ede8dc;
   font-family: Georgia, serif;
-  font-size: 13px;
-}
-
-.we-link-overlay-label {
-  color: var(--we-ink-muted);
-  font-family: monospace;
   font-size: 11px;
+  color: var(--we-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.we-link-preview-text {
-  color: var(--we-link);
-  text-decoration: underline;
-}
+/* .we-link-text inside hint picks up the link color from its global rule */
 
 .we-link-overlay-url {
   color: var(--we-link-url);
-  font-size: 0.8em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 240px;
+  font-size: 0.9em;
 }

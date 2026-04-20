@@ -100,6 +100,8 @@ interface OverlayState {
   kind: "progress" | "edit";
   source: string;
   rect: DOMRect;
+  /** Line index of the link — used to navigate away with arrow keys. */
+  line: number;
   /** For edit mode: info needed to splice the updated markdown back in. */
   editInfo?: { line: number; oldSrc: string };
 }
@@ -140,10 +142,15 @@ export function WrazzEditor({
     // Cursor inside a link-in-progress span?
     const progressEl = parent?.closest(".we-link-progress") as HTMLElement | null;
     if (progressEl && progressEl.closest(".we-editor") === el) {
+      const lineEl = progressEl.closest(".we-line") as HTMLElement | null;
+      const lineIdx = lineEl
+        ? Array.prototype.indexOf.call(el.children, lineEl)
+        : -1;
       setOverlay({
         kind: "progress",
         source: progressEl.textContent ?? "",
         rect: progressEl.getBoundingClientRect(),
+        line: Math.max(0, lineIdx),
       });
       return;
     }
@@ -162,6 +169,7 @@ export function WrazzEditor({
         kind: "edit",
         source: `[${text}](${href})`,
         rect: linkEl.getBoundingClientRect(),
+        line: Math.max(0, lineIdx),
         editInfo:
           lineIdx >= 0
             ? { line: lineIdx, oldSrc: `[${text}](${href})` }
@@ -184,11 +192,23 @@ export function WrazzEditor({
   }, [value]);
 
   // ── selectionchange: detect cursor moving into a link ───────
+  // Guard: if focus is inside the overlay (e.g. the edit input), do nothing.
+  // The overlay's onMouseDown prevents the editor selection from moving before
+  // focus transfers, so we only need to guard the focus-already-moved case.
 
   useEffect(() => {
     const onSelectionChange = () => {
       const el = editorRef.current;
-      if (!el || document.activeElement !== el) return;
+      const wrap = wrapRef.current;
+      if (!el) return;
+      // If focus left the editor but stayed inside the wrap (= overlay input),
+      // leave the overlay alone.
+      if (document.activeElement !== el) {
+        if (wrap && wrap.contains(document.activeElement)) return;
+        // Focus left entirely — dismiss.
+        setOverlay(null);
+        return;
+      }
       detectOverlay();
     };
     document.addEventListener("selectionchange", onSelectionChange);
@@ -252,6 +272,21 @@ export function WrazzEditor({
     editorRef.current?.focus();
   };
 
+  const handleLinkNavigate = (direction: -1 | 1) => {
+    const el = editorRef.current;
+    const currentLine = overlay?.line ?? 0;
+    const lineCount = value.split("\n").length;
+    const targetLine = Math.max(0, Math.min(lineCount - 1, currentLine + direction));
+    setOverlay(null);
+    el?.focus();
+    // Small delay so React can process the overlay unmount and refocus before
+    // we move the caret, otherwise restoreCaretPos races with focus().
+    setTimeout(() => {
+      if (!el) return;
+      restoreCaretPos(el, { line: targetLine, col: 0 });
+    }, 0);
+  };
+
   // ── Render ──────────────────────────────────────────────────
 
   return (
@@ -285,6 +320,7 @@ export function WrazzEditor({
           isEditing={overlay.kind === "edit"}
           onChange={handleLinkChange}
           onDismiss={handleOverlayDismiss}
+          onNavigate={handleLinkNavigate}
         />
       )}
     </div>
