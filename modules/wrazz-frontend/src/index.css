@@ -136,13 +136,13 @@ body {
 .editor-title-row {
   display: flex;
   align-items: baseline;
-  padding: 20px 16px 8px 40px;
+  padding: 32px 16px 8px calc(var(--we-margin) - 12px);
   flex-shrink: 0;
 }
 
 .editor-title {
   flex: 1;
-  font-size: 22px;
+  font-size: 32px;
   font-family: inherit;
   color: var(--ink);
   border: none;
