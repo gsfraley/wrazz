@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use chrono::Duration;
 use sqlx::SqlitePool;
@@ -17,8 +17,6 @@ use crate::store_cache::StoreCache;
 pub struct AppState {
     pub pool: SqlitePool,
     pub store_cache: Arc<StoreCache>,
-    /// Root data directory. Per-user directories are `<data_dir>/<user_id>/`.
-    pub data_dir: PathBuf,
     /// `None` when the `WRAZZ_OIDC_*` env vars are absent or discovery fails.
     /// OIDC routes return `501 Not Implemented` in that case.
     pub oidc_provider: Option<Arc<OidcProvider>>,

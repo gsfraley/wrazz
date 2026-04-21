@@ -3,24 +3,20 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio::fs;
-use wrazz_core::FileEntry;
+use wrazz_core::{DirEntry, Entry, FileContent, FileEntry};
 
 /// Errors that can arise from [`Store`] operations.
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
-    /// The requested file does not exist under the data directory.
-    #[error("not found: {id}")]
-    NotFound { id: String },
+    #[error("not found: {path}")]
+    NotFound { path: String },
 
-    /// Slug collision: every candidate filename up to the 9999-suffix cap is
-    /// already taken. In practice this requires ~10k identically-titled files.
-    #[error("conflict: {id} already exists")]
-    Conflict { id: String },
+    #[error("conflict: {path} already exists")]
+    Conflict { path: String },
 
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// The YAML front matter block could not be parsed.
     #[error("front matter parse error in {file}: {message}")]
     Parse { file: String, message: String },
 }
@@ -49,27 +45,15 @@ fn slice_is_empty(v: &[String]) -> bool {
     v.is_empty()
 }
 
-/// Low-level file I/O layer for a single directory of Markdown notes.
+/// Low-level file I/O layer for a single workspace directory of Markdown notes.
 ///
-/// A `Store` manages one flat-or-nested tree of `.md` files rooted at
-/// `data_dir`. Files use YAML front matter for metadata:
+/// `Store` is not aware of users or workspaces — callers are responsible for
+/// pointing it at the right root directory. `wrazz-server` creates one `Store`
+/// per user (workspace layout migration is a future task).
 ///
-/// ```text
-/// ---
-/// title: Morning Pages
-/// tags: [journal]
-/// created_at: 2026-04-01T07:00:00Z
-/// ---
-///
-/// Body content here.
-/// ```
-///
-/// Files without front matter are accepted as "naked" files: the title is
-/// taken from the first `# Heading` line if present, or falls back to the
-/// filename stem.
-///
-/// `Store` is not aware of users. For multi-user deployments, `wrazz-server`
-/// creates one `Store` per user, each pointed at a separate subdirectory.
+/// All methods accept paths relative to `data_dir` with no leading slash —
+/// e.g. `"morning-pages.md"` or `"journal/april.md"`. The `/`-led convention
+/// used by the `Backend` trait is stripped by callers before reaching here.
 pub struct Store {
     data_dir: PathBuf,
 }
@@ -77,67 +61,84 @@ pub struct Store {
 impl Store {
     /// Creates a new `Store` rooted at `data_dir`.
     ///
-    /// The directory is not created here — callers are responsible for
-    /// ensuring it exists before the first operation.
+    /// The directory must already exist — callers are responsible for creation.
     pub fn new(data_dir: impl Into<PathBuf>) -> Self {
         Self {
             data_dir: data_dir.into(),
         }
     }
 
-    fn full_path(&self, id: &str) -> PathBuf {
-        self.data_dir.join(id)
+    fn full_path(&self, rel_path: &str) -> PathBuf {
+        self.data_dir.join(rel_path.trim_end_matches('/'))
     }
 
-    /// Returns all `.md` files under the data directory, sorted
-    /// case-insensitively by ID (i.e. by relative path). Files that fail to
-    /// parse are skipped with a warning rather than aborting the listing.
-    pub async fn list(&self) -> StoreResult<Vec<FileEntry>> {
-        let data_dir = self.data_dir.clone();
+    /// Returns the direct children of `rel_path`, sorted case-insensitively.
+    ///
+    /// `rel_path` is relative to the data directory; use `""` for the root.
+    /// Only `.md` files and subdirectories are included. Files that fail to
+    /// parse are skipped with a warning.
+    pub async fn list(&self, rel_path: &str) -> StoreResult<Vec<Entry>> {
+        let dir = if rel_path.is_empty() {
+            self.data_dir.clone()
+        } else {
+            self.full_path(rel_path)
+        };
 
-        // walkdir is synchronous; run it off the async executor.
-        let paths = tokio::task::spawn_blocking(move || {
-            walkdir::WalkDir::new(&data_dir)
-                .follow_links(true)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| {
-                    e.file_type().is_file() && e.path().extension().is_some_and(|x| x == "md")
-                })
-                .map(|e| e.path().to_path_buf())
-                .collect::<Vec<_>>()
-        })
-        .await
-        .map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
+        let mut reader = fs::read_dir(&dir).await.map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                StoreError::NotFound { path: rel_path.to_string() }
+            } else {
+                StoreError::Io(e)
+            }
+        })?;
 
         let mut entries = Vec::new();
-        for path in paths {
-            let id = path
-                .strip_prefix(&self.data_dir)
-                .expect("walkdir always returns paths under the root")
-                .to_string_lossy()
-                .into_owned();
 
-            match self.load(&id).await {
-                Ok(entry) => entries.push(entry),
-                Err(e) => tracing::warn!("skipping {id}: {e}"),
+        while let Some(dirent) = reader.next_entry().await.map_err(StoreError::Io)? {
+            let file_type = dirent.file_type().await.map_err(StoreError::Io)?;
+            let name = dirent.file_name().to_string_lossy().into_owned();
+
+            let child_rel = if rel_path.is_empty() {
+                name.clone()
+            } else {
+                format!("{}/{}", rel_path.trim_end_matches('/'), name)
+            };
+
+            if file_type.is_dir() {
+                let metadata = fs::metadata(dirent.path()).await.map_err(StoreError::Io)?;
+                let ts: DateTime<Utc> = metadata
+                    .modified()
+                    .map(|t| t.into())
+                    .unwrap_or_else(|_| Utc::now());
+                entries.push(Entry::Dir(DirEntry {
+                    path: format!("/{child_rel}/"),
+                    created_at: ts,
+                    updated_at: ts,
+                }));
+            } else if file_type.is_file() && name.ends_with(".md") {
+                match self.load_metadata(&child_rel).await {
+                    Ok(entry) => entries.push(Entry::File(entry)),
+                    Err(e) => tracing::warn!("skipping {child_rel}: {e}"),
+                }
             }
         }
 
-        // Sort alphabetically by full path, case-insensitive — the same order
-        // a file explorer shows: directory hierarchy first, then filename within
-        // each level, matching what users expect when navigating a notes tree.
-        entries.sort_by(|a, b| a.id.to_lowercase().cmp(&b.id.to_lowercase()));
+        entries.sort_by(|a, b| {
+            let pa = match a { Entry::File(f) => &f.path, Entry::Dir(d) => &d.path };
+            let pb = match b { Entry::File(f) => &f.path, Entry::Dir(d) => &d.path };
+            pa.to_lowercase().cmp(&pb.to_lowercase())
+        });
+
         Ok(entries)
     }
 
-    /// Reads and parses the file at `id`, returning a [`FileEntry`].
-    pub async fn load(&self, id: &str) -> StoreResult<FileEntry> {
-        let path = self.full_path(id);
+    /// Reads and parses the metadata for the file at `rel_path`.
+    pub async fn load_metadata(&self, rel_path: &str) -> StoreResult<FileEntry> {
+        let path = self.full_path(rel_path);
 
         let metadata = fs::metadata(&path).await.map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
-                StoreError::NotFound { id: id.to_string() }
+                StoreError::NotFound { path: rel_path.to_string() }
             } else {
                 StoreError::Io(e)
             }
@@ -149,49 +150,75 @@ impl Store {
             .unwrap_or_else(|_| Utc::now());
 
         let raw = fs::read_to_string(&path).await.map_err(StoreError::Io)?;
-        // Normalise line endings so the parser only has to handle LF.
         let raw = raw.replace('\r', "");
 
-        self.parse(id, &raw, updated_at)
+        self.parse_metadata(rel_path, &raw, updated_at)
     }
 
-    fn parse(&self, id: &str, raw: &str, updated_at: DateTime<Utc>) -> StoreResult<FileEntry> {
+    /// Reads and returns the content of the file at `rel_path`.
+    pub async fn load_content(&self, rel_path: &str) -> StoreResult<FileContent> {
+        let path = self.full_path(rel_path);
+
+        let raw = fs::read_to_string(&path).await.map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                StoreError::NotFound { path: rel_path.to_string() }
+            } else {
+                StoreError::Io(e)
+            }
+        })?;
+        let raw = raw.replace('\r', "");
+
+        let content = if raw.starts_with("---\n") {
+            let rest = &raw[4..];
+            match rest.find("\n---\n") {
+                Some(close) => rest[close + 5..].trim_start_matches('\n').to_string(),
+                None => raw,
+            }
+        } else {
+            raw
+        };
+
+        Ok(FileContent { content })
+    }
+
+    fn parse_metadata(
+        &self,
+        rel_path: &str,
+        raw: &str,
+        updated_at: DateTime<Utc>,
+    ) -> StoreResult<FileEntry> {
+        let abs_path = format!("/{rel_path}");
+
         if raw.starts_with("---\n") {
             let rest = &raw[4..];
             let close = rest.find("\n---\n").ok_or_else(|| StoreError::Parse {
-                file: id.to_string(),
+                file: rel_path.to_string(),
                 message: "unclosed front matter".into(),
             })?;
 
-            let yaml = &rest[..close];
-            // Skip the "\n---\n" delimiter (5 chars), then any blank lines.
-            let content = rest[close + 5..].trim_start_matches('\n').to_string();
-
-            let fm: FrontMatter = serde_yaml_ng::from_str(yaml).map_err(|e| StoreError::Parse {
-                file: id.to_string(),
-                message: e.to_string(),
-            })?;
+            let fm: FrontMatter =
+                serde_yaml_ng::from_str(&rest[..close]).map_err(|e| StoreError::Parse {
+                    file: rel_path.to_string(),
+                    message: e.to_string(),
+                })?;
 
             Ok(FileEntry {
-                id: id.to_string(),
+                path: abs_path,
                 title: fm.title,
-                content,
                 tags: fm.tags,
                 created_at: fm.created_at,
                 updated_at,
             })
         } else {
-            // Naked file: no front matter at all.
             let title = raw
                 .lines()
                 .find(|l| l.starts_with("# "))
                 .map(|l| l[2..].trim().to_string())
-                .unwrap_or_else(|| stem_from_id(id));
+                .unwrap_or_else(|| stem_from_path(rel_path));
 
             Ok(FileEntry {
-                id: id.to_string(),
+                path: abs_path,
                 title,
-                content: raw.to_string(),
                 tags: Vec::new(),
                 created_at: updated_at,
                 updated_at,
@@ -199,33 +226,31 @@ impl Store {
         }
     }
 
-    fn serialize(
-        title: &str,
-        tags: &[String],
-        created_at: &DateTime<Utc>,
-        content: &str,
-    ) -> String {
+    fn serialize(title: &str, tags: &[String], created_at: &DateTime<Utc>, content: &str) -> String {
         let fm = FrontMatterOut {
             title,
             tags,
             created_at: created_at.to_rfc3339(),
         };
-        // serde_yaml_ng::to_string never fails on this struct.
         let yaml = serde_yaml_ng::to_string(&fm).unwrap_or_default();
         format!("---\n{yaml}---\n\n{content}")
     }
 
-    /// Creates a new file. The filename is derived by [`slugify`]-ing the
-    /// title; if that slug is taken a numeric suffix is tried up to `-9999`.
+    /// Creates a new file at `rel_path` with the given metadata and content.
+    ///
+    /// Returns [`StoreError::Conflict`] if the file already exists.
     pub async fn create(
         &self,
+        rel_path: &str,
         title: String,
-        content: String,
         tags: Vec<String>,
+        content: String,
     ) -> StoreResult<FileEntry> {
-        let stem = slugify(&title);
-        let id = self.find_available_id(&stem).await?;
-        let path = self.full_path(&id);
+        let path = self.full_path(rel_path);
+
+        if fs::metadata(&path).await.is_ok() {
+            return Err(StoreError::Conflict { path: rel_path.to_string() });
+        }
 
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).await.map_err(StoreError::Io)?;
@@ -236,43 +261,19 @@ impl Store {
             .await
             .map_err(StoreError::Io)?;
 
-        self.load(&id).await
+        self.load_metadata(rel_path).await
     }
 
-    async fn find_available_id(&self, stem: &str) -> StoreResult<String> {
-        let candidate = format!("{stem}.md");
-        if fs::metadata(self.full_path(&candidate)).await.is_err() {
-            return Ok(candidate);
-        }
-        // Cap at 9999 to avoid an unbounded loop if the filesystem is in a
-        // state where metadata() never errors (e.g. all of morning-pages-2.md
-        // through morning-pages-N.md exist). In practice a user would need
-        // ten thousand identically-titled notes before hitting this, but
-        // prevents crashing if the user accidentally targets something like a
-        // system dir with thousands of files.
-        for n in 2u32..=9999 {
-            let candidate = format!("{stem}-{n}.md");
-            if fs::metadata(self.full_path(&candidate)).await.is_err() {
-                return Ok(candidate);
-            }
-        }
-        Err(StoreError::Conflict {
-            id: stem.to_string(),
-        })
-    }
-
-    /// Overwrites the content of an existing file, preserving its original
-    /// `created_at` timestamp.
+    /// Overwrites the content of an existing file, preserving its `created_at`.
     pub async fn save(
         &self,
-        id: &str,
+        rel_path: &str,
         title: String,
-        content: String,
         tags: Vec<String>,
+        content: String,
     ) -> StoreResult<FileEntry> {
-        // Load first to confirm the file exists and to preserve its created_at.
-        let existing = self.load(id).await?;
-        let path = self.full_path(id);
+        let existing = self.load_metadata(rel_path).await?;
+        let path = self.full_path(rel_path);
 
         fs::write(
             &path,
@@ -281,14 +282,54 @@ impl Store {
         .await
         .map_err(StoreError::Io)?;
 
-        self.load(id).await
+        self.load_metadata(rel_path).await
     }
 
-    /// Deletes the file at `id` from the filesystem.
-    pub async fn delete(&self, id: &str) -> StoreResult<()> {
-        fs::remove_file(self.full_path(id)).await.map_err(|e| {
+    /// Deletes the file or directory at `rel_path`.
+    /// Directories are deleted recursively.
+    pub async fn delete_entry(&self, rel_path: &str) -> StoreResult<()> {
+        let path = self.full_path(rel_path);
+
+        let metadata = fs::metadata(&path).await.map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
-                StoreError::NotFound { id: id.to_string() }
+                StoreError::NotFound { path: rel_path.to_string() }
+            } else {
+                StoreError::Io(e)
+            }
+        })?;
+
+        if metadata.is_dir() {
+            fs::remove_dir_all(&path).await.map_err(StoreError::Io)
+        } else {
+            fs::remove_file(&path).await.map_err(StoreError::Io)
+        }
+    }
+
+    /// Creates a directory at `rel_path` (including any missing parents).
+    ///
+    /// Returns [`StoreError::Conflict`] if something already exists at that path.
+    pub async fn create_dir(&self, rel_path: &str) -> StoreResult<()> {
+        let path = self.full_path(rel_path);
+
+        if fs::metadata(&path).await.is_ok() {
+            return Err(StoreError::Conflict { path: rel_path.to_string() });
+        }
+
+        fs::create_dir_all(&path).await.map_err(StoreError::Io)
+    }
+
+    /// Renames/moves an entry within this Store's data directory.
+    pub async fn rename_entry(&self, from_rel: &str, to_rel: &str) -> StoreResult<()> {
+        let src = self.full_path(from_rel);
+        let dst = self.full_path(to_rel);
+
+        if let Some(parent) = dst.parent() {
+            fs::create_dir_all(parent).await.map_err(StoreError::Io)?;
+        }
+
+        fs::rename(&src, &dst).await.map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                StoreError::NotFound { path: from_rel.to_string() }
             } else {
                 StoreError::Io(e)
             }
@@ -297,9 +338,6 @@ impl Store {
 }
 
 /// Converts a title into a URL-safe filename stem.
-///
-/// Non-alphanumeric characters are replaced with hyphens, consecutive hyphens
-/// are collapsed, and leading/trailing hyphens are removed.
 ///
 /// ```
 /// # use wrazz_backend::slugify;
@@ -317,10 +355,9 @@ pub fn slugify(s: &str) -> String {
         .join("-")
 }
 
-/// Returns the filename stem from an ID like `"journal/april.md"` → `"april"`.
-fn stem_from_id(id: &str) -> String {
-    Path::new(id)
+fn stem_from_path(rel_path: &str) -> String {
+    Path::new(rel_path)
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_else(|| id.to_string())
+        .unwrap_or_else(|| rel_path.to_string())
 }

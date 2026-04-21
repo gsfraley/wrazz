@@ -13,6 +13,36 @@ use uuid::Uuid;
 
 use wrazz_server::User;
 
+// --- Workspace queries ---
+
+/// Returns the default workspace ID for `user_id`, creating one if none exists.
+///
+/// The workspace ID is a UUID string. The filesystem directory for the workspace
+/// is still `<data_dir>/<user_id>/` until the workspace layout migration is done.
+pub async fn get_or_create_default_workspace(
+    pool: &SqlitePool,
+    user_id: Uuid,
+) -> sqlx::Result<String> {
+    let row: Option<(String,)> =
+        sqlx::query_as("SELECT id FROM workspaces WHERE user_id = ? LIMIT 1")
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await?;
+
+    if let Some((id,)) = row {
+        return Ok(id);
+    }
+
+    let workspace_id = Uuid::new_v4().to_string();
+    sqlx::query("INSERT INTO workspaces (id, user_id) VALUES (?, ?)")
+        .bind(&workspace_id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+
+    Ok(workspace_id)
+}
+
 // Internal row type for queries that join users with auth providers.
 #[derive(sqlx::FromRow)]
 struct UserWithHash {

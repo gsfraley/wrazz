@@ -51,7 +51,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState {
         pool: pool.clone(),
         store_cache: Arc::clone(&store_cache),
-        data_dir,
         oidc_provider,
         session_duration: chrono::Duration::hours(session_hours),
     };
