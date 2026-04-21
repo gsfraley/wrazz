@@ -155,7 +155,6 @@ body {
   color: var(--ink-muted);
 }
 
-/* Save / Delete — bare text buttons floating to the right */
 .editor-doc-actions {
   display: flex;
   align-items: center;
@@ -181,6 +180,28 @@ body {
 }
 
 .btn-bare--danger:hover {
+  color: var(--danger);
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-muted);
+  padding: 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.btn-icon:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.btn-icon--danger:hover {
   color: var(--danger);
 }
 

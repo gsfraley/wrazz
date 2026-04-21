@@ -1,6 +1,7 @@
 import { FileEntry } from "../api/files";
 import { CurrentUser } from "../api/auth";
 import { WrazzEditor } from "wrazz-editor";
+import { Save, Trash2 } from "../icons";
 
 export interface Draft {
   title: string;
@@ -50,8 +51,12 @@ export default function Editor({
               placeholder="Title"
             />
             <div className="editor-doc-actions">
-              <button className="btn-bare" onClick={onSave}>Save</button>
-              <button className="btn-bare btn-bare--danger" onClick={onDelete}>Delete</button>
+              <button className="btn-icon" onClick={onSave} aria-label="Save">
+                <Save />
+              </button>
+              <button className="btn-icon btn-icon--danger" onClick={onDelete} aria-label="Delete">
+                <Trash2 />
+              </button>
             </div>
           </div>
           <WrazzEditor

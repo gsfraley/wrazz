@@ -1,4 +1,5 @@
 import { FileEntry } from "../api/files";
+import { FilePlus } from "../icons";
 
 interface Props {
   files: FileEntry[];
@@ -12,7 +13,9 @@ export default function FileList({ files, activeId, onSelect, onNew }: Props) {
     <aside className="sidebar">
       <div className="sidebar-header">
         <span className="sidebar-heading">Files</span>
-        <button onClick={onNew}>+ New</button>
+        <button className="btn-icon" onClick={onNew} aria-label="New file">
+          <FilePlus />
+        </button>
       </div>
       <ul className="file-list">
         {files.map((f) => (
