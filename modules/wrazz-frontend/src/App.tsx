@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
-import { FileEntry, listFiles, createFile, updateFile, deleteFile } from "./api/files";
+import { useState, useEffect } from "react";
+import { FileEntry, getFile, getFileContent, updateFile, deleteEntry } from "./api/files";
 import { CurrentUser, getCurrentUser, logout } from "./api/auth";
 import { AppStatus } from "./types";
-import FileList from "./components/FileList";
+import FileTree from "./components/FileTree";
 import Editor, { Draft } from "./components/Editor";
 import StatusBar from "./components/StatusBar";
 import LoginPage from "./components/LoginPage";
@@ -10,82 +10,68 @@ import LoginPage from "./components/LoginPage";
 export default function App() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const [files, setFiles] = useState<FileEntry[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activePath, setActivePath] = useState<string | null>(null);
+  const [activeFile, setActiveFile] = useState<FileEntry | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [status, setStatus] = useState<AppStatus | null>(null);
 
-  // Probe the session once on mount.
   useEffect(() => {
     getCurrentUser()
       .then((u) => setUser(u))
       .finally(() => setAuthChecked(true));
   }, []);
 
-  const activeFile = files.find((f) => f.id === activeId) ?? null;
-
-  // Re-fetches the file list. On auth failure, clears state (triggers login page).
-  const reload = useCallback(async () => {
-    try {
-      const fetched = await listFiles();
-      setFiles(fetched);
-    } catch {
-      const u = await getCurrentUser().catch(() => null);
-      if (!u) {
-        setUser(null);
-        setFiles([]);
-        setActiveId(null);
-        setDraft(null);
-        setStatus(null);
-      } else {
-        setStatus({ kind: "error", message: "Failed to load files." });
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (user) reload();
-  }, [user, reload]);
-
-  function handleSelect(id: string) {
-    const file = files.find((f) => f.id === id);
-    if (!file) return;
-    setActiveId(file.id);
-    setDraft({ title: file.title, content: file.content, tags: file.tags });
-    setStatus(null);
+  function reload() {
+    setReloadKey((k) => k + 1);
   }
 
-  async function handleNew() {
+  async function handleOpen(path: string) {
     try {
-      const file = await createFile("Untitled", "", []);
-      await reload();
-      setActiveId(file.id);
-      setDraft({ title: file.title, content: file.content, tags: file.tags });
-      setStatus({ kind: "ok", message: "Created" });
+      const [file, { content }] = await Promise.all([
+        getFile(path),
+        getFileContent(path),
+      ]);
+      setActivePath(path);
+      setActiveFile(file);
+      setDraft({ title: file.title, content, tags: file.tags });
+      setStatus(null);
     } catch {
-      setStatus({ kind: "error", message: "Could not create file." });
+      setStatus({ kind: "error", message: "Could not load file." });
     }
   }
 
   async function handleSave() {
-    if (!activeId || !draft) return;
+    if (!activePath || !draft) return;
     try {
-      await updateFile(activeId, draft.title, draft.content, draft.tags);
-      await reload();
+      const updated = await updateFile(activePath, draft.title, draft.tags, draft.content);
+      setActiveFile(updated);
+      reload();
       setStatus({ kind: "ok", message: "Saved" });
     } catch {
       setStatus({ kind: "error", message: "Save failed." });
     }
   }
 
-  async function handleDelete() {
-    if (!activeId) return;
-    try {
-      await deleteFile(activeId);
-      await reload();
-      setActiveId(null);
+  function handleTreeDeleted(path: string) {
+    if (!activePath) return;
+    // Clear editor if the active file was deleted directly or lived inside a deleted dir.
+    if (activePath === path || activePath.startsWith(path)) {
+      setActivePath(null);
+      setActiveFile(null);
       setDraft(null);
+    }
+  }
+
+  async function handleDelete() {
+    if (!activePath) return;
+    try {
+      await deleteEntry(activePath);
+      setActivePath(null);
+      setActiveFile(null);
+      setDraft(null);
+      reload();
       setStatus({ kind: "ok", message: "Deleted" });
     } catch {
       setStatus({ kind: "error", message: "Delete failed." });
@@ -95,8 +81,8 @@ export default function App() {
   async function handleLogout() {
     await logout();
     setUser(null);
-    setFiles([]);
-    setActiveId(null);
+    setActivePath(null);
+    setActiveFile(null);
     setDraft(null);
     setStatus(null);
   }
@@ -110,11 +96,11 @@ export default function App() {
   return (
     <div className="app">
       <div className="workspace">
-        <FileList
-          files={files}
-          activeId={activeId}
-          onSelect={handleSelect}
-          onNew={handleNew}
+        <FileTree
+          activePath={activePath}
+          onOpen={handleOpen}
+          onDeleted={handleTreeDeleted}
+          reloadKey={reloadKey}
         />
         <Editor
           file={activeFile}

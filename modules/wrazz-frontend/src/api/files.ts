@@ -1,61 +1,100 @@
 export interface FileEntry {
-  id: string;
+  path: string;
   title: string;
-  content: string;
   tags: string[];
   created_at: string;
   updated_at: string;
 }
 
-/// Percent-encodes forward slashes so the ID survives as a single path segment.
-function encodeId(id: string): string {
-  return id.replace(/\//g, "%2F");
+export interface DirEntry {
+  path: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export async function listFiles(): Promise<FileEntry[]> {
-  const resp = await fetch("/api/files");
+export type Entry =
+  | { kind: "file" } & FileEntry
+  | { kind: "dir" } & DirEntry;
+
+export interface FileContent {
+  content: string;
+}
+
+function pathToUrl(path: string): string {
+  return path.replace(/^\/|\/$/g, "");
+}
+
+export async function listEntries(path: string = "/"): Promise<Entry[]> {
+  const params = new URLSearchParams({ path });
+  const resp = await fetch(`/api/entries?${params}`);
   if (!resp.ok) throw new Error(`list failed: ${resp.status}`);
   return resp.json();
 }
 
-export async function getFile(id: string): Promise<FileEntry> {
-  const resp = await fetch(`/api/files/${encodeId(id)}`);
+export async function getFile(path: string): Promise<FileEntry> {
+  const resp = await fetch(`/api/files/${pathToUrl(path)}`);
   if (!resp.ok) throw new Error(`get failed: ${resp.status}`);
   return resp.json();
 }
 
+export async function getFileContent(path: string): Promise<FileContent> {
+  const resp = await fetch(`/api/content/${pathToUrl(path)}`);
+  if (!resp.ok) throw new Error(`get content failed: ${resp.status}`);
+  return resp.json();
+}
+
 export async function createFile(
+  path: string,
   title: string,
+  tags: string[],
   content: string,
-  tags: string[]
 ): Promise<FileEntry> {
-  const resp = await fetch("/api/files", {
+  const resp = await fetch(`/api/files/${pathToUrl(path)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, content, tags }),
+    body: JSON.stringify({ title, tags, content }),
   });
   if (!resp.ok) throw new Error(`create failed: ${resp.status}`);
   return resp.json();
 }
 
 export async function updateFile(
-  id: string,
+  path: string,
   title: string,
+  tags: string[],
   content: string,
-  tags: string[]
 ): Promise<FileEntry> {
-  const resp = await fetch(`/api/files/${encodeId(id)}`, {
+  const resp = await fetch(`/api/files/${pathToUrl(path)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, content, tags }),
+    body: JSON.stringify({ title, tags, content }),
   });
   if (!resp.ok) throw new Error(`update failed: ${resp.status}`);
   return resp.json();
 }
 
-export async function deleteFile(id: string): Promise<void> {
-  const resp = await fetch(`/api/files/${encodeId(id)}`, {
+export async function deleteEntry(path: string): Promise<void> {
+  const resp = await fetch(`/api/entries/${pathToUrl(path)}`, {
     method: "DELETE",
   });
   if (!resp.ok) throw new Error(`delete failed: ${resp.status}`);
+}
+
+export async function createDir(path: string): Promise<void> {
+  const resp = await fetch(`/api/dirs/${pathToUrl(path)}`, {
+    method: "POST",
+  });
+  if (!resp.ok) throw new Error(`create dir failed: ${resp.status}`);
+}
+
+export async function moveEntry(
+  fromPath: string,
+  toPath: string,
+): Promise<void> {
+  const resp = await fetch(`/api/entries/${pathToUrl(fromPath)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ to_path: toPath }),
+  });
+  if (!resp.ok) throw new Error(`move failed: ${resp.status}`);
 }

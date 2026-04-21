@@ -85,32 +85,106 @@ body {
   overflow: hidden;
 }
 
-.file-list {
-  flex: 1;
-  overflow-y: auto;
-  list-style: none;
-  padding: 4px 0;
+.sidebar-header-actions {
+  display: flex;
+  gap: 2px;
 }
 
-.file-item {
-  padding: 6px 14px;
+/* ── File tree ────────────────────────────────────────────────── */
+
+.tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 26px;
   cursor: pointer;
-  font-size: 14px;
   color: var(--ink-muted);
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   user-select: none;
+  padding-right: 6px;
 }
 
-.file-item:hover {
+.tree-row:hover {
   color: var(--ink);
   background: rgba(0, 0, 0, 0.03);
 }
 
-.file-item.active {
+.tree-row.active {
   color: var(--ink);
   background: rgba(0, 0, 0, 0.06);
+}
+
+.tree-chevron {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 14px;
+  color: var(--ink-muted);
+}
+
+.tree-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Inline row actions: hidden until the row is hovered */
+.tree-actions {
+  display: none;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.tree-row:hover .tree-actions {
+  display: flex;
+}
+
+.tree-edit-input {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--ink-muted);
+  border-radius: 2px;
+  padding: 1px 4px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+  min-width: 0;
+}
+
+.tree-row.drag-over {
+  background: rgba(0, 0, 0, 0.06);
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
+}
+
+.tree-root-drop {
+  margin: 8px;
+  padding: 40px 8px;
+  border: 1.5px dashed var(--border);
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  text-align: center;
+  cursor: default;
+  user-select: none;
+}
+
+.tree-root-drop.drag-over {
+  border-color: var(--ink-muted);
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.03);
 }
 
 /* ── Editor column ────────────────────────────────────────────── */

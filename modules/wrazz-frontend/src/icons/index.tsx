@@ -35,6 +35,32 @@ export function Save({ size = 16, ...props }: IconProps) {
   );
 }
 
+export function ChevronRight({ size = 16, ...props }: IconProps) {
+  return (
+    <svg {...defaults(size)} {...props}>
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
+export function ChevronDown({ size = 16, ...props }: IconProps) {
+  return (
+    <svg {...defaults(size)} {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+export function FolderPlus({ size = 16, ...props }: IconProps) {
+  return (
+    <svg {...defaults(size)} {...props}>
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+      <line x1="12" y1="11" x2="12" y2="17" />
+      <line x1="9" y1="14" x2="15" y2="14" />
+    </svg>
+  );
+}
+
 export function Trash2({ size = 16, ...props }: IconProps) {
   return (
     <svg {...defaults(size)} {...props}>
