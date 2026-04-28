@@ -50,6 +50,7 @@ struct UserWithHash {
     display_name: String,
     created_at: DateTime<Utc>,
     is_admin: bool,
+    email: Option<String>,
     credential_hash: Option<String>,
 }
 
@@ -57,7 +58,7 @@ struct UserWithHash {
 
 pub async fn get_user_by_id(pool: &SqlitePool, id: Uuid) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
-        "SELECT id, display_name, created_at, is_admin FROM users WHERE id = ?",
+        "SELECT id, display_name, created_at, is_admin, email FROM users WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -82,7 +83,7 @@ pub async fn get_user_by_password_subject(
 ) -> sqlx::Result<Option<(User, String)>> {
     let row = sqlx::query_as::<_, UserWithHash>(
         r#"
-        SELECT u.id, u.display_name, u.created_at, u.is_admin, p.credential_hash
+        SELECT u.id, u.display_name, u.created_at, u.is_admin, u.email, p.credential_hash
         FROM users u
         JOIN user_auth_providers p ON p.user_id = u.id
         WHERE p.provider = 'password' AND p.subject = ? AND p.credential_hash IS NOT NULL
@@ -100,6 +101,7 @@ pub async fn get_user_by_password_subject(
                     display_name: r.display_name,
                     created_at: r.created_at,
                     is_admin: r.is_admin,
+                    email: r.email,
                 },
                 hash,
             )
@@ -113,13 +115,24 @@ pub async fn get_user_by_oidc_subject(
 ) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
         r#"
-        SELECT u.id, u.display_name, u.created_at, u.is_admin
+        SELECT u.id, u.display_name, u.created_at, u.is_admin, u.email
         FROM users u
         JOIN user_auth_providers p ON p.user_id = u.id
         WHERE p.provider = 'oidc' AND p.subject = ?
         "#,
     )
     .bind(sub)
+    .fetch_optional(pool)
+    .await
+}
+
+/// Looks up a user by their email address. Used as a fallback in the OIDC
+/// callback to link a new OIDC sub to an existing password account.
+pub async fn get_user_by_email(pool: &SqlitePool, email: &str) -> sqlx::Result<Option<User>> {
+    sqlx::query_as::<_, User>(
+        "SELECT id, display_name, created_at, is_admin, email FROM users WHERE email = ?",
+    )
+    .bind(email)
     .fetch_optional(pool)
     .await
 }
@@ -160,49 +173,59 @@ pub async fn create_user_with_password(
 
     // Fetch back to pick up the server-side created_at default.
     sqlx::query_as::<_, User>(
-        "SELECT id, display_name, created_at, is_admin FROM users WHERE id = ?",
+        "SELECT id, display_name, created_at, is_admin, email FROM users WHERE id = ?",
     )
     .bind(user_id)
     .fetch_one(pool)
     .await
 }
 
-/// Creates a new user and an `'oidc'` auth provider row in a single
-/// transaction. Called during OIDC callback when no existing user matches the
-/// provider's `sub` claim (auto-provisioning).
-pub async fn create_user_with_oidc(
-    pool: &SqlitePool,
-    display_name: &str,
-    sub: &str,
-) -> sqlx::Result<User> {
-    let user_id = Uuid::new_v4();
-    let mut tx = pool.begin().await?;
-
-    sqlx::query(
-        "INSERT INTO users (id, display_name) VALUES (?, ?)",
-    )
-    .bind(user_id)
-    .bind(display_name)
-    .execute(&mut *tx)
-    .await?;
-
+/// Adds an OIDC auth provider row to an existing user. Called when the OIDC
+/// callback matches an existing user by email rather than by sub claim —
+/// subsequent logins will match by sub and skip the email lookup.
+pub async fn link_oidc_to_user(pool: &SqlitePool, user_id: Uuid, sub: &str) -> sqlx::Result<()> {
     sqlx::query(
         "INSERT INTO user_auth_providers (id, user_id, provider, subject) VALUES (?, ?, 'oidc', ?)",
     )
     .bind(Uuid::new_v4())
     .bind(user_id)
     .bind(sub)
-    .execute(&mut *tx)
+    .execute(pool)
     .await?;
+    Ok(())
+}
 
-    tx.commit().await?;
+/// Sets or clears the email address on a user record.
+pub async fn set_user_email(
+    pool: &SqlitePool,
+    user_id: Uuid,
+    email: Option<&str>,
+) -> sqlx::Result<()> {
+    sqlx::query("UPDATE users SET email = ? WHERE id = ?")
+        .bind(email)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
 
+/// Returns all users ordered by creation date ascending.
+pub async fn list_users(pool: &SqlitePool) -> sqlx::Result<Vec<User>> {
     sqlx::query_as::<_, User>(
-        "SELECT id, display_name, created_at, is_admin FROM users WHERE id = ?",
+        "SELECT id, display_name, created_at, is_admin, email FROM users ORDER BY created_at ASC",
     )
-    .bind(user_id)
-    .fetch_one(pool)
+    .fetch_all(pool)
     .await
+}
+
+/// Deletes a user and all cascading rows (sessions, auth providers, workspaces).
+/// Files on disk are not removed.
+pub async fn delete_user(pool: &SqlitePool, user_id: Uuid) -> sqlx::Result<()> {
+    sqlx::query("DELETE FROM users WHERE id = ?")
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 // --- OIDC config queries ---
@@ -283,7 +306,7 @@ pub async fn create_session(
 pub async fn get_session_user(pool: &SqlitePool, session_id: Uuid) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
         r#"
-        SELECT u.id, u.display_name, u.created_at, u.is_admin
+        SELECT u.id, u.display_name, u.created_at, u.is_admin, u.email
         FROM users u
         JOIN sessions s ON s.user_id = u.id
         WHERE s.id = ? AND s.expires_at > unixepoch('now')

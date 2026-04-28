@@ -1,20 +1,24 @@
 import { FormEvent, useEffect, useState } from "react";
 import Modal from "./Modal";
 import {
+  AdminUser,
   OidcConfig,
   SECRET_REDACTED,
   deleteOidcConfig,
+  deleteUser,
   getOidcConfig,
+  listUsers,
   saveOidcConfig,
 } from "../../api/admin";
 
-type AdminPage = "info" | "sso";
+type AdminPage = "info" | "sso" | "users";
 
 interface Props {
   onClose: () => void;
+  currentUserId: string;
 }
 
-export default function AdminModal({ onClose }: Props) {
+export default function AdminModal({ onClose, currentUserId }: Props) {
   const [page, setPage] = useState<AdminPage>("info");
 
   return (
@@ -33,10 +37,17 @@ export default function AdminModal({ onClose }: Props) {
           >
             SSO
           </button>
+          <button
+            className={`admin-nav-item${page === "users" ? " active" : ""}`}
+            onClick={() => setPage("users")}
+          >
+            Users
+          </button>
         </nav>
         <div className="admin-section">
           {page === "info" && <InfoPage />}
           {page === "sso" && <SsoPage />}
+          {page === "users" && <UsersPage currentUserId={currentUserId} />}
         </div>
       </div>
     </Modal>
@@ -270,5 +281,59 @@ function SsoPage() {
         </div>
       )}
     </form>
+  );
+}
+
+function UsersPage({ currentUserId }: { currentUserId: string }) {
+  const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  useEffect(() => {
+    listUsers()
+      .then(setUsers)
+      .catch(() => setError("Could not load users."));
+  }, []);
+
+  async function handleDelete(user: AdminUser) {
+    if (!window.confirm(`Delete account "${user.display_name}"? This cannot be undone.`)) return;
+    setDeleting(user.id);
+    try {
+      await deleteUser(user.id);
+      setUsers((u) => u?.filter((x) => x.id !== user.id) ?? null);
+    } catch {
+      setError("Could not delete user.");
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  if (error) return <p className="admin-users-error">{error}</p>;
+  if (!users) return <p className="admin-users-loading">Loading…</p>;
+
+  return (
+    <div className="admin-users">
+      {users.map((u) => (
+        <div key={u.id} className="admin-user-row">
+          <div className="admin-user-info">
+            <span className="admin-user-name">{u.display_name}</span>
+            {u.is_admin && <span className="admin-user-badge">Admin</span>}
+            <span className="admin-user-email">
+              {u.email ?? <em className="admin-user-email--unset">no email set</em>}
+            </span>
+          </div>
+          {u.id !== currentUserId && (
+            <button
+              className="admin-user-delete"
+              onClick={() => handleDelete(u)}
+              disabled={deleting === u.id}
+              aria-label={`Delete ${u.display_name}`}
+            >
+              {deleting === u.id ? "…" : "Delete"}
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }

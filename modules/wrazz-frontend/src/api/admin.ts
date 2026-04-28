@@ -50,3 +50,22 @@ export async function getOidcStatus(): Promise<OidcStatus> {
   if (!resp.ok) return { enabled: false };
   return resp.json();
 }
+
+export interface AdminUser {
+  id: string;
+  display_name: string;
+  email: string | null;
+  is_admin: boolean;
+  created_at: string;
+}
+
+export async function listUsers(): Promise<AdminUser[]> {
+  const resp = await fetch("/api/admin/users");
+  if (!resp.ok) throw new Error(`list users failed: ${resp.status}`);
+  return resp.json();
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  const resp = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+  if (!resp.ok) throw new Error(`delete user failed: ${resp.status}`);
+}

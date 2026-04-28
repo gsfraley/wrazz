@@ -40,4 +40,9 @@ pub struct User {
     /// any user by ID. The first admin is provisioned at startup via
     /// `WRAZZ_BOOTSTRAP_ADMIN`.
     pub is_admin: bool,
+    /// Contact email. Used as a fallback key for linking OIDC logins to
+    /// existing password accounts: if an OIDC sub claim is unrecognised, the
+    /// callback matches by email and links the provider rather than creating
+    /// a new account.
+    pub email: Option<String>,
 }

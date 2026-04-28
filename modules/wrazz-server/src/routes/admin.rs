@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
-use axum::{Json, extract::State, http::StatusCode};
+use axum::{Json, extract::{Path, State}, http::StatusCode};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+use wrazz_server::User;
 
 use crate::db::{self, OidcConfig};
 use crate::routes::auth::AuthUser;
@@ -182,6 +184,34 @@ pub async fn delete_oidc(
 
     *state.oidc_provider.write().await = None;
 
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `GET /api/admin/users` — list all user accounts.
+pub async fn list_users(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+) -> Result<Json<Vec<User>>, (StatusCode, String)> {
+    require_admin(&auth_user)?;
+    let users = db::list_users(&state.pool).await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(users))
+}
+
+/// `DELETE /api/admin/users/{id}` — delete a user account.
+///
+/// Returns 400 if the caller tries to delete their own account.
+pub async fn delete_user(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    require_admin(&auth_user)?;
+    if auth_user.0.id == id {
+        return Err((StatusCode::BAD_REQUEST, "cannot delete your own account".into()));
+    }
+    db::delete_user(&state.pool, id).await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
