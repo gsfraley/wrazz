@@ -1,13 +1,18 @@
+import { useRef, useState } from "react";
 import { FileEntry } from "../api/files";
 import { CurrentUser } from "../api/auth";
 import { WrazzEditor } from "wrazz-editor";
 import { Save, Trash2 } from "../icons";
+import ProfileModal from "./modals/ProfileModal";
+import AdminModal from "./modals/AdminModal";
 
 export interface Draft {
   title: string;
   content: string;
   tags: string[];
 }
+
+type Modal = "profile" | "admin" | null;
 
 interface Props {
   file: FileEntry | null;
@@ -28,16 +33,35 @@ export default function Editor({
   user,
   onLogout,
 }: Props) {
+  const menuRef = useRef<HTMLDetailsElement>(null);
+  const [modal, setModal] = useState<Modal>(null);
+
+  function openModal(m: Modal) {
+    if (menuRef.current) menuRef.current.open = false;
+    setModal(m);
+  }
+
   return (
     <main className="editor">
       <div className="editor-header">
-        <details className="user-menu">
+        <details ref={menuRef} className="user-menu">
           <summary className="user-menu-trigger">{user.display_name}</summary>
           <div className="user-menu-dropdown">
+            <button onClick={() => openModal("profile")}>Profile</button>
+            {user.is_admin && (
+              <button onClick={() => openModal("admin")}>Administration</button>
+            )}
+            <div className="user-menu-divider" />
             <button onClick={onLogout}>Sign out</button>
           </div>
         </details>
       </div>
+      {modal === "profile" && (
+        <ProfileModal user={user} onClose={() => setModal(null)} />
+      )}
+      {modal === "admin" && (
+        <AdminModal onClose={() => setModal(null)} />
+      )}
 
       {!file || !draft ? (
         <div className="editor-empty">Select a file or create a new one.</div>
