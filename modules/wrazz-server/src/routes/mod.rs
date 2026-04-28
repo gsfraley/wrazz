@@ -17,6 +17,7 @@
 /// - `POST   /api/files`               — create file
 /// - `PUT    /api/files/{*path}`        — update file
 /// - `POST   /api/dirs`                — create directory
+pub mod admin;
 pub mod auth;
 pub mod files;
 pub mod oidc;
@@ -35,12 +36,17 @@ pub fn router(state: AppState, static_dir: Option<String>) -> Router {
         .route("/login", post(auth::login))
         .route("/logout", post(auth::logout))
         .route("/oidc/redirect", get(oidc::oidc_redirect))
-        .route("/oidc/callback", get(oidc::oidc_callback));
+        .route("/oidc/callback", get(oidc::oidc_callback))
+        .route("/oidc/status", get(oidc::oidc_status));
 
     let user_routes = Router::new()
         .route("/user", post(user::create_user))
         .route("/user/self", get(user::get_user_self))
         .route("/user/{handle}", get(user::get_user_by_handle));
+
+    let admin_routes = Router::new()
+        .route("/admin/oidc",
+            get(admin::get_oidc).put(admin::put_oidc).delete(admin::delete_oidc));
 
     let entry_routes = Router::new()
         .route("/entries", get(files::list_entries))
@@ -58,6 +64,7 @@ pub fn router(state: AppState, static_dir: Option<String>) -> Router {
     let api = Router::new()
         .nest("/auth", auth_routes)
         .merge(user_routes)
+        .merge(admin_routes)
         .merge(entry_routes)
         .merge(file_routes)
         .merge(content_routes)

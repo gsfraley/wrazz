@@ -1,5 +1,6 @@
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { login } from "../api/auth";
+import { getOidcStatus } from "../api/admin";
 import type { CurrentUser } from "../api/auth";
 
 interface Props {
@@ -11,6 +12,11 @@ export default function LoginPage({ onLogin }: Props) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [oidcEnabled, setOidcEnabled] = useState(false);
+
+  useEffect(() => {
+    getOidcStatus().then((s) => setOidcEnabled(s.enabled));
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -67,6 +73,17 @@ export default function LoginPage({ onLogin }: Props) {
             {busy ? "signing in…" : "sign in"}
           </button>
         </form>
+
+        {oidcEnabled && (
+          <>
+            <div className="login-divider">
+              <span className="login-divider-label">or</span>
+            </div>
+            <a className="login-sso" href="/api/auth/oidc/redirect">
+              sign in with SSO
+            </a>
+          </>
+        )}
       </div>
     </div>
   );

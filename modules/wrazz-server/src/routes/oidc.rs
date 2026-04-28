@@ -1,13 +1,16 @@
 use std::{
     collections::HashMap,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use axum::{
+    Json,
     extract::{Query, State},
     http::StatusCode,
     response::Redirect,
 };
+use serde::Serialize;
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 use openidconnect::{
     AuthenticationFlow,
@@ -97,6 +100,18 @@ pub struct CallbackParams {
     state: String,
 }
 
+/// `GET /api/auth/oidc/status` — unauthenticated probe used by the login page
+/// to decide whether to show the SSO button.
+#[derive(Serialize)]
+pub struct OidcStatusResponse {
+    pub enabled: bool,
+}
+
+pub async fn oidc_status(State(state): State<AppState>) -> Json<OidcStatusResponse> {
+    let enabled = state.oidc_provider.read().await.is_some();
+    Json(OidcStatusResponse { enabled })
+}
+
 /// `GET /api/auth/oidc/redirect` — begins the authorization code flow.
 ///
 /// Generates a fresh CSRF token, nonce, and PKCE challenge, stores the
@@ -105,10 +120,10 @@ pub struct CallbackParams {
 pub async fn oidc_redirect(
     State(state): State<AppState>,
 ) -> Result<Redirect, (StatusCode, &'static str)> {
-    let provider = state
-        .oidc_provider
-        .as_ref()
-        .ok_or((StatusCode::NOT_IMPLEMENTED, "OIDC not configured"))?;
+    let provider = {
+        let guard = state.oidc_provider.read().await;
+        Arc::clone(guard.as_ref().ok_or((StatusCode::NOT_IMPLEMENTED, "OIDC not configured"))?)
+    };
 
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
     let (auth_url, csrf_token, nonce) = provider
@@ -152,10 +167,10 @@ pub async fn oidc_callback(
     State(state): State<AppState>,
     Query(params): Query<CallbackParams>,
 ) -> Result<(CookieJar, Redirect), (StatusCode, String)> {
-    let provider = state
-        .oidc_provider
-        .as_ref()
-        .ok_or_else(|| (StatusCode::NOT_IMPLEMENTED, "OIDC not configured".into()))?;
+    let provider = {
+        let guard = state.oidc_provider.read().await;
+        Arc::clone(guard.as_ref().ok_or_else(|| (StatusCode::NOT_IMPLEMENTED, "OIDC not configured".to_string()))?)
+    };
 
     let pending = provider
         .pending

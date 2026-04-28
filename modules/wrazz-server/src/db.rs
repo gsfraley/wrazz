@@ -205,6 +205,55 @@ pub async fn create_user_with_oidc(
     .await
 }
 
+// --- OIDC config queries ---
+
+/// The persisted OIDC provider configuration. One optional row in `oidc_config`.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct OidcConfig {
+    pub issuer_url: String,
+    pub client_id: String,
+    pub client_secret: String,
+    pub redirect_uri: String,
+    pub enabled: bool,
+}
+
+pub async fn get_oidc_config(pool: &SqlitePool) -> sqlx::Result<Option<OidcConfig>> {
+    sqlx::query_as::<_, OidcConfig>(
+        "SELECT issuer_url, client_id, client_secret, redirect_uri, enabled \
+         FROM oidc_config WHERE id = 1",
+    )
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn upsert_oidc_config(pool: &SqlitePool, config: &OidcConfig) -> sqlx::Result<()> {
+    sqlx::query(
+        "INSERT INTO oidc_config (id, issuer_url, client_id, client_secret, redirect_uri, enabled) \
+         VALUES (1, ?, ?, ?, ?, ?) \
+         ON CONFLICT(id) DO UPDATE SET \
+           issuer_url    = excluded.issuer_url, \
+           client_id     = excluded.client_id, \
+           client_secret = excluded.client_secret, \
+           redirect_uri  = excluded.redirect_uri, \
+           enabled       = excluded.enabled",
+    )
+    .bind(&config.issuer_url)
+    .bind(&config.client_id)
+    .bind(&config.client_secret)
+    .bind(&config.redirect_uri)
+    .bind(config.enabled)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn delete_oidc_config(pool: &SqlitePool) -> sqlx::Result<()> {
+    sqlx::query("DELETE FROM oidc_config WHERE id = 1")
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 // --- Session queries ---
 
 /// Inserts a new session and returns its UUID. Expiry is stored as a Unix
