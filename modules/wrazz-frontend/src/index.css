@@ -1,9 +1,12 @@
 :root {
-  --paper:      #f5f0e8;
-  --ink:        #1a1a18;
-  --ink-muted:  #7a7a6e;
-  --border:     #e0d9cc;
-  --danger:     #a03030;
+  --paper:         #f5f0e8;
+  --paper-sidebar: #f1ece3;
+  --paper-topbar:  #e4dfd3;
+  --ink:           #1a1a18;
+  --ink-muted:     #7a7a6e;
+  --border:        #e0d9cc;
+  --border-strong: #c8c0b0;
+  --danger:        #a03030;
 
   /* Bridge wrazz-editor custom properties to the app theme */
   --we-ink:       var(--ink);
@@ -52,14 +55,30 @@ body {
 .editor-header {
   height: 40px;
   padding: 0 14px;
-  border-bottom: 1px solid var(--border);
+  background: var(--paper-topbar);
+  border-bottom: 1px solid var(--border-strong);
   display: flex;
   align-items: center;
   flex-shrink: 0;
 }
 
 .sidebar-header {
+  position: relative;
   justify-content: space-between;
+}
+
+/* Overlay the sidebar's --border with --border-strong in the topbar zone only.
+ * right: -1px positions the pseudo at the sidebar's outer border edge, which
+ * is 1px outside sidebar-header's content box. overflow:hidden is removed from
+ * .sidebar so this isn't clipped. */
+.sidebar-header::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--border-strong);
 }
 
 .editor-header {
@@ -79,10 +98,10 @@ body {
 .sidebar {
   width: 240px;
   flex-shrink: 0;
+  background: var(--paper-sidebar);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 .sidebar-header-actions {
@@ -317,7 +336,7 @@ body {
   font-family: ui-monospace, monospace;
   color: var(--ink-muted);
   padding: 3px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 3px;
   user-select: none;
 }
@@ -362,6 +381,420 @@ body {
 .user-menu-dropdown button:hover {
   color: var(--ink);
   background: rgba(0, 0, 0, 0.04);
+}
+
+.user-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 3px 0;
+}
+
+/* ── Modals ───────────────────────────────────────────────────── */
+
+/*
+ * Backdrop sits ~300px above screen center.
+ * clamp(24px, 50vh - 300px, 30vh) ensures the modal never clips the top edge
+ * on small viewports and never drifts below the upper third on tall ones.
+ */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: clamp(24px, calc(50vh - 400px), 30vh);
+  padding-bottom: 24px;
+  overflow-y: auto;
+  z-index: 200;
+}
+
+.modal {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  width: 800px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - clamp(24px, calc(50vh - 400px), 30vh) - 24px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal--wide {
+  width: 1200px;
+  min-height: 580px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modal-title {
+  font-size: 13px;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-size: 20px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.05);
+  border-color: transparent;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 36px 30px;
+}
+
+/* Profile modal */
+
+.profile-name {
+  font-size: 30px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: normal;
+  color: var(--ink);
+  margin-bottom: 28px;
+}
+
+.profile-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-label {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.profile-value {
+  font-size: 16px;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--ink);
+}
+
+.profile-value--mono {
+  font-family: ui-monospace, monospace;
+  font-size: 14px;
+  word-break: break-all;
+}
+
+/* Admin modal */
+
+.admin-modal-inner {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.admin-nav {
+  width: 160px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  padding: 10px 0;
+}
+
+.admin-nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--ink-muted);
+  padding: 8px 18px;
+}
+
+.admin-nav-item:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.04);
+  border-color: transparent;
+}
+
+.admin-nav-item.active {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.06);
+  border-color: transparent;
+}
+
+.admin-section {
+  flex: 1;
+  overflow-y: auto;
+  padding: 36px 30px;
+}
+
+.admin-info-name {
+  font-size: 28px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: normal;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.admin-info-version {
+  font-size: 13px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  margin-bottom: 22px;
+}
+
+.admin-info-desc {
+  font-size: 17px;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--ink);
+  line-height: 1.6;
+  margin-bottom: 22px;
+}
+
+.admin-info-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-info-link {
+  font-size: 13px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  text-decoration: none;
+}
+
+.admin-info-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+/* SSO configuration form */
+
+.sso-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sso-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sso-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-muted);
+  flex-shrink: 0;
+}
+
+.sso-status-dot--active {
+  background: #5a8060;
+}
+
+.sso-status-label {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+}
+
+.sso-env-notice {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 8px 12px;
+  line-height: 1.5;
+}
+
+.sso-env-notice code {
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.sso-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sso-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sso-label {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.sso-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  outline: none;
+}
+
+.sso-input:focus {
+  border-color: var(--ink-muted);
+}
+
+.sso-input:disabled {
+  opacity: 0.5;
+}
+
+.sso-secret-row {
+  display: flex;
+  gap: 6px;
+}
+
+.sso-secret-row .sso-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.sso-secret-toggle {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.sso-secret-toggle:hover {
+  color: var(--ink);
+  border-color: var(--ink-muted);
+}
+
+.sso-redirect-uri {
+  font-size: 13px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  padding: 2px 0;
+}
+
+.sso-redirect-uri--missing {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+}
+
+.sso-redirect-uri--missing code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.sso-enabled-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.sso-enabled-label {
+  font-size: 13px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+}
+
+.sso-message {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+}
+
+.sso-message--error { color: var(--danger); }
+.sso-message--ok    { color: #5a8060; }
+
+.sso-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.sso-btn {
+  padding: 7px 16px;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.sso-btn:hover {
+  color: var(--ink);
+  border-color: var(--ink-muted);
+}
+
+.sso-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sso-btn--primary {
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+.sso-btn--primary:hover {
+  border-color: var(--ink-muted);
+}
+
+.sso-btn--danger:hover {
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 /* ── Buttons (generic) ────────────────────────────────────────── */
@@ -458,4 +891,48 @@ button:hover {
   width: 100%;
   padding: 7px 10px;
   font-size: 12px;
+}
+
+.login-divider {
+  position: relative;
+  text-align: center;
+  margin: 20px 0 16px;
+}
+
+.login-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border);
+}
+
+.login-divider-label {
+  position: relative;
+  background: var(--paper);
+  padding: 0 10px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+}
+
+.login-sso {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  text-align: center;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  text-decoration: none;
+  background: transparent;
+}
+
+.login-sso:hover {
+  color: var(--ink);
+  border-color: var(--ink-muted);
 }

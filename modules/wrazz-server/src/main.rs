@@ -10,6 +10,9 @@ use argon2::{
     password_hash::{SaltString, rand_core::OsRng},
 };
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use tokio::sync::RwLock;
+
+use crate::routes::oidc::OidcProvider;
 use state::AppState;
 
 #[tokio::main]
@@ -22,10 +25,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("WRAZZ_DATA_DIR").unwrap_or_else(|_| "./data".into()).into();
     let bind = std::env::var("WRAZZ_BIND").unwrap_or_else(|_| "127.0.0.1:3001".into());
     let static_dir = std::env::var("WRAZZ_STATIC_DIR").ok();
+    let public_url = std::env::var("WRAZZ_PUBLIC_URL").ok();
     let session_hours: i64 = std::env::var("WRAZZ_SESSION_HOURS")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(24 * 7); // default: one week
+        .unwrap_or(24 * 7);
 
     tokio::fs::create_dir_all(&data_dir).await?;
 
@@ -46,13 +50,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let store_cache = Arc::new(store_cache::StoreCache::new(&data_dir));
 
-    let oidc_provider = build_oidc_provider().await;
+    let oidc_provider = Arc::new(RwLock::new(build_oidc_provider(&pool).await));
 
     let state = AppState {
         pool: pool.clone(),
         store_cache: Arc::clone(&store_cache),
         oidc_provider,
         session_duration: chrono::Duration::hours(session_hours),
+        public_url,
     };
 
     // Background task: expire sessions and evict idle store entries hourly.
@@ -124,20 +129,49 @@ async fn maybe_bootstrap_admin(pool: &sqlx::SqlitePool) {
     }
 }
 
-/// Reads the four `WRAZZ_OIDC_*` env vars and runs provider discovery.
-async fn build_oidc_provider() -> Option<Arc<routes::oidc::OidcProvider>> {
-    let issuer_url = std::env::var("WRAZZ_OIDC_ISSUER_URL").ok()?;
-    let client_id = std::env::var("WRAZZ_OIDC_CLIENT_ID").ok()?;
-    let client_secret = std::env::var("WRAZZ_OIDC_CLIENT_SECRET").ok()?;
-    let redirect_uri = std::env::var("WRAZZ_OIDC_REDIRECT_URI").ok()?;
+/// Determines the initial OIDC provider at startup.
+///
+/// Precedence: env vars > DB config. Both sources attempt discovery; if the
+/// preferred source's discovery fails, the other source is not tried (env vars
+/// are authoritative when present; DB config is authoritative when env vars are
+/// absent).
+async fn build_oidc_provider(pool: &sqlx::SqlitePool) -> Option<Arc<OidcProvider>> {
+    // Env vars take unconditional precedence.
+    if let (Ok(issuer), Ok(client_id), Ok(secret), Ok(redirect_uri)) = (
+        std::env::var("WRAZZ_OIDC_ISSUER_URL"),
+        std::env::var("WRAZZ_OIDC_CLIENT_ID"),
+        std::env::var("WRAZZ_OIDC_CLIENT_SECRET"),
+        std::env::var("WRAZZ_OIDC_REDIRECT_URI"),
+    ) {
+        return match OidcProvider::discover(issuer, client_id, secret, redirect_uri).await {
+            Ok(p) => {
+                tracing::info!("OIDC provider configured from environment variables");
+                Some(Arc::new(p))
+            }
+            Err(e) => {
+                tracing::warn!("OIDC env var discovery failed, OIDC unavailable: {e}");
+                None
+            }
+        };
+    }
 
-    match routes::oidc::OidcProvider::discover(issuer_url, client_id, client_secret, redirect_uri).await {
-        Ok(provider) => {
-            tracing::info!("OIDC provider configured");
-            Some(Arc::new(provider))
+    // Fall back to DB config.
+    match db::get_oidc_config(pool).await {
+        Ok(Some(c)) if c.enabled => {
+            match OidcProvider::discover(c.issuer_url, c.client_id, c.client_secret, c.redirect_uri).await {
+                Ok(p) => {
+                    tracing::info!("OIDC provider configured from database");
+                    Some(Arc::new(p))
+                }
+                Err(e) => {
+                    tracing::warn!("OIDC DB config discovery failed, OIDC unavailable: {e}");
+                    None
+                }
+            }
         }
+        Ok(_) => None,
         Err(e) => {
-            tracing::warn!("OIDC discovery failed, OIDC will be unavailable: {e}");
+            tracing::warn!("failed to read OIDC config from DB: {e}");
             None
         }
     }
