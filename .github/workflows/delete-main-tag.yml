@@ -1,0 +1,36 @@
+name: delete-main-tag
+
+on:
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+jobs:
+  delete:
+    name: Delete stale :main package tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find and delete version tagged :main
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const versions = await github.paginate(
+              github.rest.packages.getAllPackageVersionsForPackageOwnedByAuthenticatedUser,
+              { package_type: 'container', package_name: 'wrazz-server' }
+            );
+            const target = versions.find(v =>
+              v.metadata?.container?.tags?.includes('main')
+            );
+            if (!target) {
+              core.notice('No version found with :main tag — nothing to do.');
+              return;
+            }
+            core.notice(`Deleting version ${target.id} (tags: ${target.metadata.container.tags.join(', ')})`);
+            await github.rest.packages.deletePackageVersionForAuthenticatedUser({
+              package_type: 'container',
+              package_name: 'wrazz-server',
+              package_version_id: target.id,
+            });
+            core.notice('Done.');
