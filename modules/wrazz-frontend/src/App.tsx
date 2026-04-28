@@ -110,6 +110,7 @@ export default function App() {
           onDelete={handleDelete}
           user={user}
           onLogout={handleLogout}
+          onUserUpdated={setUser}
         />
       </div>
       <StatusBar title={draft?.title ?? null} status={status} />

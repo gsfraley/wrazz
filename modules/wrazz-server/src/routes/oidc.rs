@@ -135,6 +135,7 @@ pub async fn oidc_redirect(
         )
         .add_scope(Scope::new("openid".into()))
         .add_scope(Scope::new("profile".into()))
+        .add_scope(Scope::new("email".into()))
         .set_pkce_challenge(pkce_challenge)
         .url();
 
@@ -200,22 +201,42 @@ pub async fn oidc_callback(
         .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
 
     let sub = claims.subject().as_str().to_string();
+    let email = claims.email().map(|e| e.as_str().to_string());
 
-    // Find existing user or auto-provision one from the OIDC claims.
+    // 1. Match by OIDC subject (fast path — covers all logins after the first).
+    // 2. Match by email (first-time SSO login for an existing password account).
+    //    On match, link the sub so future logins hit path 1.
+    // 3. No match → reject. Auto-provisioning is disabled; accounts must be
+    //    created by an admin and have their email set before SSO can be used.
     let user = match db::get_user_by_oidc_subject(&state.pool, &sub)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
     {
         Some(u) => u,
         None => {
-            let display_name = claims
-                .preferred_username()
-                .map(|u| u.as_str().to_string())
-                .unwrap_or_else(|| sub.clone());
-
-            db::create_user_with_oidc(&state.pool, &display_name, &sub)
-                .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            match email.as_deref() {
+                Some(email_str) => {
+                    match db::get_user_by_email(&state.pool, email_str)
+                        .await
+                        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+                    {
+                        Some(u) => {
+                            db::link_oidc_to_user(&state.pool, u.id, &sub)
+                                .await
+                                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                            u
+                        }
+                        None => return Err((
+                            StatusCode::FORBIDDEN,
+                            "No account found for this SSO identity. Ask an administrator to create an account and set your email address.".into(),
+                        )),
+                    }
+                }
+                None => return Err((
+                    StatusCode::FORBIDDEN,
+                    "No account found for this SSO identity. Ask an administrator to create an account and set your email address.".into(),
+                )),
+            }
         }
     };
 

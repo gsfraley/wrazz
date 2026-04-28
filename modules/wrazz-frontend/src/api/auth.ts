@@ -3,6 +3,7 @@ export interface CurrentUser {
   display_name: string;
   is_admin: boolean;
   created_at: string;
+  email: string | null;
 }
 
 /// Returns the current user if a valid session cookie exists, otherwise null.

@@ -22,6 +22,7 @@ interface Props {
   onDelete: () => void;
   user: CurrentUser;
   onLogout: () => void;
+  onUserUpdated: (user: CurrentUser) => void;
 }
 
 export default function Editor({
@@ -32,6 +33,7 @@ export default function Editor({
   onDelete,
   user,
   onLogout,
+  onUserUpdated,
 }: Props) {
   const menuRef = useRef<HTMLDetailsElement>(null);
   const [modal, setModal] = useState<Modal>(null);
@@ -57,10 +59,14 @@ export default function Editor({
         </details>
       </div>
       {modal === "profile" && (
-        <ProfileModal user={user} onClose={() => setModal(null)} />
+        <ProfileModal
+          user={user}
+          onClose={() => setModal(null)}
+          onUpdated={(u) => { onUserUpdated(u); }}
+        />
       )}
       {modal === "admin" && (
-        <AdminModal onClose={() => setModal(null)} />
+        <AdminModal onClose={() => setModal(null)} currentUserId={user.id} />
       )}
 
       {!file || !draft ? (

@@ -27,6 +27,11 @@ pub struct CreateUserRequest {
     pub display_name: String,
 }
 
+#[derive(Deserialize)]
+pub struct UpdateSelfRequest {
+    pub email: Option<String>,
+}
+
 // --- Handlers ---
 
 /// `POST /api/user` — create a new password-auth account.
@@ -71,6 +76,33 @@ pub async fn create_user(
 /// `GET /api/user/self` — return the authenticated caller's own user record.
 pub async fn get_user_self(auth_user: AuthUser) -> Json<User> {
     Json(auth_user.0)
+}
+
+/// `PUT /api/user/self` — update the caller's email address.
+///
+/// Pass `null` to clear the email. Returns 409 if the address is taken.
+pub async fn update_user_self(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+    Json(req): Json<UpdateSelfRequest>,
+) -> Result<Json<User>, (StatusCode, String)> {
+    db::set_user_email(&state.pool, auth_user.0.id, req.email.as_deref())
+        .await
+        .map_err(|e| {
+            if let sqlx::Error::Database(ref dbe) = e {
+                if dbe.is_unique_violation() {
+                    return (StatusCode::CONFLICT, "email already in use".into());
+                }
+            }
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
+
+    let user = db::get_user_by_id(&state.pool, auth_user.0.id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".into()))?;
+
+    Ok(Json(user))
 }
 
 /// `GET /api/user/id:<uuid>` — look up a user by their UUID.

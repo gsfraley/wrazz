@@ -41,12 +41,14 @@ pub fn router(state: AppState, static_dir: Option<String>) -> Router {
 
     let user_routes = Router::new()
         .route("/user", post(user::create_user))
-        .route("/user/self", get(user::get_user_self))
+        .route("/user/self", get(user::get_user_self).put(user::update_user_self))
         .route("/user/{handle}", get(user::get_user_by_handle));
 
     let admin_routes = Router::new()
         .route("/admin/oidc",
-            get(admin::get_oidc).put(admin::put_oidc).delete(admin::delete_oidc));
+            get(admin::get_oidc).put(admin::put_oidc).delete(admin::delete_oidc))
+        .route("/admin/users", get(admin::list_users))
+        .route("/admin/users/{id}", delete(admin::delete_user));
 
     let entry_routes = Router::new()
         .route("/entries", get(files::list_entries))
