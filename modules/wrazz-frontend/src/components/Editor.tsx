@@ -2,9 +2,10 @@ import { useRef, useState } from "react";
 import { FileEntry } from "../api/files";
 import { CurrentUser } from "../api/auth";
 import { WrazzEditor } from "wrazz-editor";
-import { Save, Trash2 } from "../icons";
+import { Save } from "../icons";
 import ProfileModal from "./modals/ProfileModal";
 import AdminModal from "./modals/AdminModal";
+import { pathToDisplayTitle } from "../App";
 
 export interface Draft {
   title: string;
@@ -17,9 +18,9 @@ type Modal = "profile" | "admin" | null;
 interface Props {
   file: FileEntry | null;
   draft: Draft | null;
+  activePath: string | null;
   onChange: (draft: Draft) => void;
   onSave: () => void;
-  onDelete: () => void;
   user: CurrentUser;
   onLogout: () => void;
   onUserUpdated: (user: CurrentUser) => void;
@@ -28,9 +29,9 @@ interface Props {
 export default function Editor({
   file,
   draft,
+  activePath,
   onChange,
   onSave,
-  onDelete,
   user,
   onLogout,
   onUserUpdated,
@@ -72,29 +73,25 @@ export default function Editor({
       {!file || !draft ? (
         <div className="editor-empty">Select a file or create a new one.</div>
       ) : (
-        <>
+        <div className="editor-body">
           <div className="editor-title-row">
             <input
               className="editor-title"
               value={draft.title}
               onChange={(e) => onChange({ ...draft, title: e.target.value })}
-              placeholder="Title"
+              placeholder={activePath ? pathToDisplayTitle(activePath) : "Title"}
             />
-            <div className="editor-doc-actions">
-              <button className="btn-icon" onClick={onSave} aria-label="Save">
-                <Save />
-              </button>
-              <button className="btn-icon btn-icon--danger" onClick={onDelete} aria-label="Delete">
-                <Trash2 />
-              </button>
-            </div>
           </div>
           <WrazzEditor
             value={draft.content}
             onChange={(content) => onChange({ ...draft, content })}
             placeholder="Start writing…"
           />
-        </>
+          {/* After WrazzEditor in DOM so tab order is: title → editor → save */}
+          <button className="btn-icon editor-save-btn" onClick={onSave} aria-label="Save">
+            <Save />
+          </button>
+        </div>
       )}
     </main>
   );

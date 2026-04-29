@@ -1,11 +1,31 @@
-import { useState, useEffect } from "react";
-import { FileEntry, getFile, getFileContent, updateFile, deleteEntry } from "./api/files";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { FileEntry, getFile, getFileContent, updateFile } from "./api/files";
 import { CurrentUser, getCurrentUser, logout } from "./api/auth";
 import { AppStatus } from "./types";
 import FileTree from "./components/FileTree";
 import Editor, { Draft } from "./components/Editor";
 import StatusBar from "./components/StatusBar";
 import LoginPage from "./components/LoginPage";
+
+// ── Title helpers ──────────────────────────────────────────────────────────
+
+export function hasFrontMatterTitle(content: string): boolean {
+  if (!content.startsWith("---\n")) return false;
+  const close = content.indexOf("\n---\n", 4);
+  if (close < 0) return false;
+  return /^\s*title\s*:/m.test(content.slice(4, close));
+}
+
+export function pathToDisplayTitle(path: string): string {
+  const filename = path.split("/").filter(Boolean).pop() ?? path;
+  return filename.replace(/\.md$/i, "").replace(/[-_]/g, " ");
+}
+
+// ── App ────────────────────────────────────────────────────────────────────
+
+const SIDEBAR_MIN = 160;
+const SIDEBAR_MAX = 520;
+const SIDEBAR_DEFAULT = 240;
 
 export default function App() {
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -16,6 +36,31 @@ export default function App() {
   const [activeFile, setActiveFile] = useState<FileEntry | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [status, setStatus] = useState<AppStatus | null>(null);
+
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
+  const dragState = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const onResizerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragState.current = { startX: e.clientX, startWidth: sidebarWidth };
+
+    function onMove(ev: MouseEvent) {
+      if (!dragState.current) return;
+      const delta = ev.clientX - dragState.current.startX;
+      setSidebarWidth(Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, dragState.current.startWidth + delta)));
+    }
+    function onUp() {
+      dragState.current = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [sidebarWidth]);
 
   useEffect(() => {
     getCurrentUser()
@@ -35,7 +80,8 @@ export default function App() {
       ]);
       setActivePath(path);
       setActiveFile(file);
-      setDraft({ title: file.title, content, tags: file.tags });
+      const title = hasFrontMatterTitle(content) ? file.title : "";
+      setDraft({ title, content, tags: file.tags });
       setStatus(null);
     } catch {
       setStatus({ kind: "error", message: "Could not load file." });
@@ -56,25 +102,10 @@ export default function App() {
 
   function handleTreeDeleted(path: string) {
     if (!activePath) return;
-    // Clear editor if the active file was deleted directly or lived inside a deleted dir.
     if (activePath === path || activePath.startsWith(path)) {
       setActivePath(null);
       setActiveFile(null);
       setDraft(null);
-    }
-  }
-
-  async function handleDelete() {
-    if (!activePath) return;
-    try {
-      await deleteEntry(activePath);
-      setActivePath(null);
-      setActiveFile(null);
-      setDraft(null);
-      reload();
-      setStatus({ kind: "ok", message: "Deleted" });
-    } catch {
-      setStatus({ kind: "error", message: "Delete failed." });
     }
   }
 
@@ -101,19 +132,21 @@ export default function App() {
           onOpen={handleOpen}
           onDeleted={handleTreeDeleted}
           reloadKey={reloadKey}
+          width={sidebarWidth}
         />
+        <div className="sidebar-resizer" onMouseDown={onResizerMouseDown} />
         <Editor
           file={activeFile}
           draft={draft}
+          activePath={activePath}
           onChange={setDraft}
           onSave={handleSave}
-          onDelete={handleDelete}
           user={user}
           onLogout={handleLogout}
           onUserUpdated={setUser}
         />
       </div>
-      <StatusBar title={draft?.title ?? null} status={status} />
+      <StatusBar title={draft?.title || (activePath ? pathToDisplayTitle(activePath) : null)} status={status} />
     </div>
   );
 }
