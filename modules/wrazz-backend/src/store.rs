@@ -227,6 +227,11 @@ impl Store {
     }
 
     fn serialize(title: &str, tags: &[String], created_at: &DateTime<Utc>, content: &str) -> String {
+        // No title and no tags → write a naked file. created_at is recovered
+        // from filesystem mtime, same as any other foreign Markdown file.
+        if title.is_empty() && tags.is_empty() {
+            return content.to_string();
+        }
         let fm = FrontMatterOut {
             title,
             tags,
