@@ -216,6 +216,18 @@ export function renderLineHtml(line: string, cursorCol?: number): string {
     body = renderInlineHtml(line);
   }
 
+  // h4+ — same visual weight as h3 but the margin mark shows numeric depth
+  const deepMatch = line.match(/^(#{4,}) /);
+  if (deepMatch) {
+    const depth = deepMatch[1].length;
+    const content = line.slice(deepMatch[0].length);
+    return (
+      `<div class="we-line we-h3">` +
+      `<span class="we-mark" data-heading-depth="${depth}">${depth}#</span>` +
+      renderInlineHtml(content) +
+      `</div>`
+    );
+  }
   if (line.startsWith("### ")) {
     return (
       `<div class="we-line we-h3">` +
@@ -277,6 +289,13 @@ export function extractLineText(lineEl: Element): string {
       return;
     }
     const el = node as Element;
+
+    // Deep heading mark — reconstruct the original #### prefix.
+    const headingDepth = (el as HTMLElement).dataset.headingDepth;
+    if (headingDepth) {
+      text += "#".repeat(parseInt(headingDepth)) + " ";
+      return;
+    }
 
     // Find a modifier that owns this element.
     const mod = MODIFIERS.find(
