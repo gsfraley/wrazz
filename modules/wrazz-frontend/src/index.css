@@ -67,19 +67,7 @@ body {
   justify-content: space-between;
 }
 
-/* Overlay the sidebar's --border with --border-strong in the topbar zone only.
- * right: -1px positions the pseudo at the sidebar's outer border edge, which
- * is 1px outside sidebar-header's content box. overflow:hidden is removed from
- * .sidebar so this isn't clipped. */
-.sidebar-header::after {
-  content: '';
-  position: absolute;
-  right: -1px;
-  top: 0;
-  width: 1px;
-  height: 100%;
-  background: var(--border-strong);
-}
+/* The resizer element acts as the full-height divider; no pseudo-element needed. */
 
 .editor-header {
   justify-content: flex-end;
@@ -96,12 +84,61 @@ body {
 /* ── Sidebar ──────────────────────────────────────────────────── */
 
 .sidebar {
-  width: 240px;
+  /* Width driven by inline style (user-resizable via .sidebar-resizer). */
   flex-shrink: 0;
   background: var(--paper-sidebar);
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-resizer {
+  width: 8px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  position: relative;
+  /*
+   * Topbar zone (first 40px): full-width --paper-topbar.
+   * Body zone: left half blends into sidebar, right half into editor.
+   * Layered gradients: top layer fills topbar, bottom layer provides body split.
+   */
+  background:
+    linear-gradient(to bottom, var(--paper-topbar) 40px, transparent 40px),
+    linear-gradient(to right, var(--paper-sidebar) 50%, var(--paper) 50%);
+}
+
+/* 1px visual line centred within the 8px grab area.
+   Topbar zone shows --border-strong; body zone shows --border. */
+.sidebar-resizer::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    to bottom,
+    var(--border-strong) 40px,
+    var(--border) 40px
+  );
+  transition: background 0.1s;
+}
+
+.sidebar-resizer:hover::before,
+.sidebar-resizer:active::before {
+  background: var(--border-strong);
+}
+
+/* Bridge the horizontal topbar bottom-border across the resizer gap */
+.sidebar-resizer::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 39px;
+  height: 1px;
+  background: var(--border-strong);
 }
 
 .sidebar-header-actions {
@@ -224,7 +261,22 @@ body {
   font-size: 14px;
 }
 
-/* ── Title row (title input + floating doc actions) ───────────── */
+/* Positioned container so the save button can be absolutely placed
+   while sitting after WrazzEditor in DOM order for correct tab flow. */
+.editor-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.editor-save-btn {
+  position: absolute;
+  top: 32px;
+  right: 16px;
+}
+
+/* ── Title row ────────────────────────────────────────────────── */
 
 .editor-title-row {
   display: flex;
@@ -242,19 +294,14 @@ body {
   background: transparent;
   outline: none;
   min-width: 0;
+  /* Leave room for the absolutely-positioned save button */
+  padding-right: 40px;
 }
 
 .editor-title::placeholder {
   color: var(--ink-muted);
 }
 
-.editor-doc-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-  padding-left: 12px;
-}
 
 .btn-bare {
   background: none;
@@ -352,6 +399,42 @@ body {
   display: none;
 }
 
+/* ── Context menu ─────────────────────────────────────────────── */
+
+.ctx-menu {
+  background: var(--paper);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  min-width: 150px;
+  padding: 3px 0;
+  user-select: none;
+}
+
+.ctx-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink-muted);
+  padding: 6px 14px;
+}
+
+.ctx-menu-item:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.04);
+  border-color: transparent;
+}
+
+.ctx-menu-item--danger:hover {
+  color: var(--danger);
+}
+
 .user-menu-dropdown {
   position: absolute;
   right: 0;
@@ -387,6 +470,54 @@ body {
   height: 1px;
   background: var(--border);
   margin: 3px 0;
+}
+
+/* ── Confirm modal ────────────────────────────────────────────── */
+
+.confirm-modal-body {
+  padding: 24px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.confirm-modal-message {
+  font-size: 15px;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirm-btn {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.confirm-btn:hover {
+  color: var(--ink);
+  border-color: var(--ink-muted);
+}
+
+.confirm-btn--danger {
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+.confirm-btn--danger:hover {
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 /* ── Modals ───────────────────────────────────────────────────── */
@@ -425,6 +556,10 @@ body {
 .modal--wide {
   width: 1200px;
   min-height: 580px;
+}
+
+.modal--narrow {
+  width: 360px;
 }
 
 .modal-header {
