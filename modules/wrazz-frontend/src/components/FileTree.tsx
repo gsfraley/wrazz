@@ -1,12 +1,21 @@
 import { useState, useEffect, useRef } from "react";
 import { Entry, createFile, createDir, moveEntry, deleteEntry, listEntries } from "../api/files";
 import { ChevronRight, ChevronDown, FilePlus, FolderPlus, Trash2 } from "../icons";
+import ContextMenu, { ContextMenuItem } from "./ContextMenu";
+import ConfirmModal from "./modals/ConfirmModal";
 
 interface Props {
   activePath: string | null;
   onOpen: (path: string) => void;
   onDeleted: (path: string) => void;
   reloadKey: number;
+  width: number;
+}
+
+interface CtxState {
+  x: number;
+  y: number;
+  items: ContextMenuItem[];
 }
 
 // ── Path helpers ───────────────────────────────────────────────────────────
@@ -33,7 +42,7 @@ function sortedEntries(entries: Entry[]): Entry[] {
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: Props) {
+export default function FileTree({ activePath, onOpen, onDeleted, reloadKey, width }: Props) {
   const [root, setRoot] = useState<Entry[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [children, setChildren] = useState<Map<string, Entry[]>>(new Map());
@@ -41,13 +50,13 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
   const [editValue, setEditValue] = useState("");
   const [dragPath, setDragPath] = useState<string | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
+  const [ctx, setCtx] = useState<CtxState | null>(null);
+  const [confirmPath, setConfirmPath] = useState<string | null>(null);
 
   const editInputRef = useRef<HTMLInputElement>(null);
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
 
-  // Focus and place selection when edit mode is entered.
-  // Select everything before the extension for files, all for dirs.
   useEffect(() => {
     const input = editInputRef.current;
     if (!editingPath || !input) return;
@@ -60,7 +69,6 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
     }
   }, [editingPath]);
 
-  // Full refresh on reloadKey change (triggered by external save / delete).
   useEffect(() => {
     async function refresh() {
       const rootEntries = await listEntries("/").catch(() => []);
@@ -112,7 +120,7 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
       const name = i === 0 ? "untitled.md" : `untitled-${i + 1}.md`;
       const path = `${dir}/${name}`;
       try {
-        const file = await createFile(path, "Untitled", [], "");
+        const file = await createFile(path, "", [], "");
         await refreshDir(parentPath);
         setEditingPath(file.path);
         setEditValue(entryName(file.path));
@@ -140,6 +148,7 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
 
   // ── Delete ───────────────────────────────────────────────────────────────
 
+  // No confirmation — used by the context menu (right-click is itself deliberate).
   async function doDelete(path: string) {
     const parent = parentDir(path);
     try {
@@ -151,6 +160,11 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
       await refreshDir(parent);
       onDeleted(path);
     } catch { /* delete failed */ }
+  }
+
+  // Confirmation — used by the visible trash icon (single accidental click is plausible).
+  function doDeleteConfirm(path: string) {
+    setConfirmPath(path);
   }
 
   // ── Rename (inline edit) ──────────────────────────────────────────────────
@@ -193,7 +207,7 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
     if (!src) return;
 
     const isDir = src.endsWith("/");
-    if (isDir && destDir.startsWith(src)) return; // can't move into own subtree
+    if (isDir && destDir.startsWith(src)) return;
 
     const srcName = entryName(src);
     const prefix = destDir === "/" ? "" : destDir.replace(/\/$/, "");
@@ -212,6 +226,37 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
       }
       if (!isDir && src === activePath) onOpen(newPath);
     } catch { /* move failed */ }
+  }
+
+  // ── Context menu ──────────────────────────────────────────────────────────
+
+  function openCtx(e: React.MouseEvent, items: ContextMenuItem[]) {
+    e.preventDefault();
+    e.stopPropagation();
+    setCtx({ x: e.clientX + 4, y: e.clientY + 4, items });
+  }
+
+  function fileCtxItems(path: string): ContextMenuItem[] {
+    return [
+      { label: "Rename", onClick: () => startEdit(path) },
+      { label: "Delete", danger: true, onClick: () => doDelete(path) },
+    ];
+  }
+
+  function dirCtxItems(path: string): ContextMenuItem[] {
+    return [
+      { label: "New File", onClick: () => doNewFile(path) },
+      { label: "New Folder", onClick: () => doNewDir(path) },
+      { label: "Rename", onClick: () => startEdit(path) },
+      { label: "Delete", danger: true, onClick: () => doDelete(path) },
+    ];
+  }
+
+  function backgroundCtxItems(): ContextMenuItem[] {
+    return [
+      { label: "New File", onClick: () => doNewFile("/") },
+      { label: "New Folder", onClick: () => doNewDir("/") },
+    ];
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -233,6 +278,7 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
               style={{ paddingLeft: dirIndent }}
               onClick={() => !isEditing && toggleDir(entry.path)}
               onDoubleClick={() => startEdit(entry.path)}
+              onContextMenu={(e) => !isEditing && openCtx(e, dirCtxItems(entry.path))}
               draggable={!isEditing}
               onDragStart={(e) => { e.stopPropagation(); setDragPath(entry.path); }}
               onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverPath(entry.path); }}
@@ -267,7 +313,7 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
                   <button className="btn-icon" onClick={(e) => { e.stopPropagation(); doNewDir(entry.path); }} aria-label="New folder in folder">
                     <FolderPlus size={13} />
                   </button>
-                  <button className="btn-icon btn-icon--danger" onClick={(e) => { e.stopPropagation(); doDelete(entry.path); }} aria-label="Delete folder">
+                  <button className="btn-icon btn-icon--danger" onClick={(e) => { e.stopPropagation(); doDeleteConfirm(entry.path); }} aria-label="Delete folder">
                     <Trash2 size={13} />
                   </button>
                 </span>
@@ -285,6 +331,7 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
           style={{ paddingLeft: fileIndent }}
           onClick={() => !isEditing && onOpen(entry.path)}
           onDoubleClick={() => startEdit(entry.path)}
+          onContextMenu={(e) => !isEditing && openCtx(e, fileCtxItems(entry.path))}
           draggable={!isEditing}
           onDragStart={(e) => { e.stopPropagation(); setDragPath(entry.path); }}
           onDragEnd={() => { setDragPath(null); setDragOverPath(null); }}
@@ -306,7 +353,7 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
             <>
               <span className="tree-name">{entryName(entry.path)}</span>
               <span className="tree-actions">
-                <button className="btn-icon btn-icon--danger" onClick={(e) => { e.stopPropagation(); doDelete(entry.path); }} aria-label="Delete file">
+                <button className="btn-icon btn-icon--danger" onClick={(e) => { e.stopPropagation(); doDeleteConfirm(entry.path); }} aria-label="Delete file">
                   <Trash2 size={13} />
                 </button>
               </span>
@@ -318,7 +365,7 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
   }
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" style={{ width }}>
       <div className="sidebar-header">
         <span className="sidebar-heading">Files</span>
         <div className="sidebar-header-actions">
@@ -330,7 +377,14 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
           </button>
         </div>
       </div>
-      <div className="tree">
+      <div
+        className="tree"
+        onContextMenu={(e) => {
+          // Only show background menu when clicking on empty space, not on a row.
+          if ((e.target as HTMLElement).closest(".tree-row")) return;
+          openCtx(e, backgroundCtxItems());
+        }}
+      >
         {renderEntries(root, 0)}
         {dragPath !== null && (
           <div
@@ -343,6 +397,21 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey }: P
           </div>
         )}
       </div>
+      {ctx && (
+        <ContextMenu
+          x={ctx.x}
+          y={ctx.y}
+          items={ctx.items}
+          onClose={() => setCtx(null)}
+        />
+      )}
+      {confirmPath && (
+        <ConfirmModal
+          message={`Delete "${entryName(confirmPath)}"?`}
+          onConfirm={() => doDelete(confirmPath)}
+          onClose={() => setConfirmPath(null)}
+        />
+      )}
     </aside>
   );
 }

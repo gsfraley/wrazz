@@ -4,10 +4,11 @@ interface Props {
   title: string;
   onClose: () => void;
   wide?: boolean;
+  className?: string;
   children: React.ReactNode;
 }
 
-export default function Modal({ title, onClose, wide, children }: Props) {
+export default function Modal({ title, onClose, wide, className, children }: Props) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -19,7 +20,7 @@ export default function Modal({ title, onClose, wide, children }: Props) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className={`modal${wide ? " modal--wide" : ""}`}
+        className={`modal${wide ? " modal--wide" : ""}${className ? ` ${className}` : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
