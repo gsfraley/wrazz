@@ -118,10 +118,9 @@ export function WrazzEditor({
   const wrapRef = useRef<HTMLDivElement>(null);
   const isComposing = useRef(false);
   const renderedValue = useRef<string | null>(null);
-  // Set true for a short window when the user mousedowns inside the overlay so
-  // the selectionchange handler doesn't dismiss the overlay while focus is
-  // transferring from the editor to the overlay input.
-  const overlayInteracting = useRef(false);
+  // Overlay state captured at mousedown, before selectionchange fires.
+  // Used to detect second-click-on-link → open in new tab.
+  const overlayAtMouseDown = useRef<OverlayState | null>(null);
 
   const [overlay, setOverlay] = useState<OverlayState | null>(null);
 
@@ -195,27 +194,15 @@ export function WrazzEditor({
     // Don't touch caret for external changes (file switch, etc.)
   }, [value]);
 
-  // ── selectionchange: detect cursor moving into/out of a link ─
+  // ── selectionchange: detect cursor position (detection only, not dismissal) ─
+  // Dismissal is handled by onBlur on the .we-wrap container instead, which
+  // gives us relatedTarget to distinguish "focus left component" from
+  // "focus moved to overlay input".
 
   useEffect(() => {
     const onSelectionChange = () => {
       const el = editorRef.current;
-      const wrap = wrapRef.current;
-      if (!el) return;
-
-      // The user just mousedown'd inside the overlay; focus is mid-transfer
-      // from editor to overlay input. React's onMouseDown fires via bubble-
-      // phase delegation, which is too late to prevent the browser's default
-      // selection processing. So we use this flag to ignore the event window.
-      if (overlayInteracting.current) return;
-
-      if (document.activeElement !== el) {
-        // If focus moved to the overlay input (still inside wrap), leave it.
-        if (wrap && wrap.contains(document.activeElement)) return;
-        // Focus left the component entirely — dismiss.
-        setOverlay(null);
-        return;
-      }
+      if (!el || document.activeElement !== el) return;
       detectOverlay();
     };
     document.addEventListener("selectionchange", onSelectionChange);
@@ -279,15 +266,6 @@ export function WrazzEditor({
     editorRef.current?.focus();
   };
 
-  const handleOverlayInteractionStart = () => {
-    overlayInteracting.current = true;
-    // 200ms is well beyond the focus-transfer window; reset so normal
-    // selectionchange handling resumes once the input has focus.
-    setTimeout(() => {
-      overlayInteracting.current = false;
-    }, 200);
-  };
-
   const handleLinkNavigate = (direction: -1 | 1) => {
     const el = editorRef.current;
     const currentLine = overlay?.line ?? 0;
@@ -310,6 +288,14 @@ export function WrazzEditor({
       ref={wrapRef}
       className={`we-wrap${className ? ` ${className}` : ""}`}
       style={{ position: "relative" }}
+      onBlur={(e) => {
+        // Dismiss the overlay only when focus leaves the entire .we-wrap.
+        // relatedTarget is the element receiving focus; if it's inside the wrap
+        // (e.g. the overlay input), we stay open.
+        if (!wrapRef.current?.contains(e.relatedTarget as Node | null)) {
+          setOverlay(null);
+        }
+      }}
     >
       <div
         ref={editorRef}
@@ -318,6 +304,13 @@ export function WrazzEditor({
         suppressContentEditableWarning
         spellCheck={false}
         data-placeholder={placeholder}
+        onMouseDown={() => { overlayAtMouseDown.current = overlay; }}
+        onClick={(e) => {
+          const linkEl = (e.target as HTMLElement).closest(".we-link") as HTMLElement | null;
+          if (!linkEl || overlayAtMouseDown.current?.kind !== "edit") return;
+          const href = linkEl.getAttribute("data-href") ?? "";
+          if (href) window.open(href, "_blank", "noopener,noreferrer");
+        }}
         onInput={handleInput}
         onPaste={handlePaste}
         onCompositionStart={() => {
@@ -337,7 +330,6 @@ export function WrazzEditor({
           onChange={handleLinkChange}
           onDismiss={handleOverlayDismiss}
           onNavigate={handleLinkNavigate}
-          onInteractionStart={handleOverlayInteractionStart}
         />
       )}
     </div>
