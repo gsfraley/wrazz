@@ -9,13 +9,6 @@ import LoginPage from "./components/LoginPage";
 
 // ── Title helpers ──────────────────────────────────────────────────────────
 
-export function hasFrontMatterTitle(content: string): boolean {
-  if (!content.startsWith("---\n")) return false;
-  const close = content.indexOf("\n---\n", 4);
-  if (close < 0) return false;
-  return /^\s*title\s*:/m.test(content.slice(4, close));
-}
-
 export function pathToDisplayTitle(path: string): string {
   const filename = path.split("/").filter(Boolean).pop() ?? path;
   return filename.replace(/\.md$/i, "").replace(/[-_]/g, " ");
@@ -80,8 +73,7 @@ export default function App() {
       ]);
       setActivePath(path);
       setActiveFile(file);
-      const title = hasFrontMatterTitle(content) ? file.title : "";
-      setDraft({ title, content, tags: file.tags });
+      setDraft({ title: file.title, content, tags: file.tags });
       setStatus(null);
     } catch {
       setStatus({ kind: "error", message: "Could not load file." });
