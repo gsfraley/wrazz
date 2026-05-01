@@ -120,7 +120,7 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey, wid
       const name = i === 0 ? "untitled.md" : `untitled-${i + 1}.md`;
       const path = `${dir}/${name}`;
       try {
-        const file = await createFile(path, "", [], "");
+        const file = await createFile(path, null, [], "");
         await refreshDir(parentPath);
         setEditingPath(file.path);
         setEditValue(entryName(file.path));

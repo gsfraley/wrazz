@@ -1,6 +1,6 @@
 export interface FileEntry {
   path: string;
-  title: string;
+  title: string | null;
   tags: string[];
   created_at: string;
   updated_at: string;
@@ -45,7 +45,7 @@ export async function getFileContent(path: string): Promise<FileContent> {
 
 export async function createFile(
   path: string,
-  title: string,
+  title: string | null,
   tags: string[],
   content: string,
 ): Promise<FileEntry> {
@@ -60,7 +60,7 @@ export async function createFile(
 
 export async function updateFile(
   path: string,
-  title: string,
+  title: string | null,
   tags: string[],
   content: string,
 ): Promise<FileEntry> {

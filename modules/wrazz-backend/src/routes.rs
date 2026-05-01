@@ -76,7 +76,8 @@ fn root_path() -> String { "/".to_string() }
 
 #[derive(Deserialize)]
 struct CreateFileRequest {
-    title: String,
+    #[serde(default)]
+    title: Option<String>,
     #[serde(default)]
     tags: Vec<String>,
     content: String,
@@ -84,7 +85,8 @@ struct CreateFileRequest {
 
 #[derive(Deserialize)]
 struct UpdateFileRequest {
-    title: String,
+    #[serde(default)]
+    title: Option<String>,
     #[serde(default)]
     tags: Vec<String>,
     content: String,

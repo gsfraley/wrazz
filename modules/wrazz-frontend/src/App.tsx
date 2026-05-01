@@ -73,7 +73,7 @@ export default function App() {
       ]);
       setActivePath(path);
       setActiveFile(file);
-      setDraft({ title: file.title, content, tags: file.tags });
+      setDraft({ title: file.title ?? "", content, tags: file.tags });
       setStatus(null);
     } catch {
       setStatus({ kind: "error", message: "Could not load file." });
@@ -83,7 +83,7 @@ export default function App() {
   async function handleSave() {
     if (!activePath || !draft) return;
     try {
-      const updated = await updateFile(activePath, draft.title, draft.tags, draft.content);
+      const updated = await updateFile(activePath, draft.title.trim() || null, draft.tags, draft.content);
       setActiveFile(updated);
       reload();
       setStatus({ kind: "ok", message: "Saved" });

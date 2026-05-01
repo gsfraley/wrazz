@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,8 @@ pub type StoreResult<T> = Result<T, StoreError>;
 // Deserialised from a file's YAML front matter block.
 #[derive(Deserialize)]
 struct FrontMatter {
-    title: String,
+    #[serde(default)]
+    title: Option<String>,
     #[serde(default)]
     tags: Vec<String>,
     created_at: DateTime<Utc>,
@@ -35,7 +36,8 @@ struct FrontMatter {
 // Serialised into a file's YAML front matter block.
 #[derive(Serialize)]
 struct FrontMatterOut<'a> {
-    title: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    title: Option<&'a str>,
     #[serde(skip_serializing_if = "slice_is_empty")]
     tags: &'a [String],
     created_at: String,
@@ -204,21 +206,16 @@ impl Store {
 
             Ok(FileEntry {
                 path: abs_path,
-                title: fm.title,
+                title: fm.title.filter(|t| !t.is_empty()),
                 tags: fm.tags,
                 created_at: fm.created_at,
                 updated_at,
             })
         } else {
-            let title = raw
-                .lines()
-                .find(|l| l.starts_with("# "))
-                .map(|l| l[2..].trim().to_string())
-                .unwrap_or_else(|| stem_from_path(rel_path));
-
+            // No front matter → no title set; frontend shows a placeholder.
             Ok(FileEntry {
                 path: abs_path,
-                title,
+                title: None,
                 tags: Vec::new(),
                 created_at: updated_at,
                 updated_at,
@@ -226,14 +223,14 @@ impl Store {
         }
     }
 
-    fn serialize(title: &str, tags: &[String], created_at: &DateTime<Utc>, content: &str) -> String {
-        // No title and no tags → write a naked file. created_at is recovered
-        // from filesystem mtime, same as any other foreign Markdown file.
-        if title.is_empty() && tags.is_empty() {
+    fn serialize(title: Option<&str>, tags: &[String], created_at: &DateTime<Utc>, content: &str) -> String {
+        let effective_title = title.map(str::trim).filter(|t| !t.is_empty());
+        // No title and no tags → write a naked file (no front matter).
+        if effective_title.is_none() && tags.is_empty() {
             return content.to_string();
         }
         let fm = FrontMatterOut {
-            title,
+            title: effective_title,
             tags,
             created_at: created_at.to_rfc3339(),
         };
@@ -247,7 +244,7 @@ impl Store {
     pub async fn create(
         &self,
         rel_path: &str,
-        title: String,
+        title: Option<String>,
         tags: Vec<String>,
         content: String,
     ) -> StoreResult<FileEntry> {
@@ -262,7 +259,7 @@ impl Store {
         }
 
         let now = Utc::now();
-        fs::write(&path, Self::serialize(&title, &tags, &now, &content))
+        fs::write(&path, Self::serialize(title.as_deref(), &tags, &now, &content))
             .await
             .map_err(StoreError::Io)?;
 
@@ -273,7 +270,7 @@ impl Store {
     pub async fn save(
         &self,
         rel_path: &str,
-        title: String,
+        title: Option<String>,
         tags: Vec<String>,
         content: String,
     ) -> StoreResult<FileEntry> {
@@ -282,7 +279,7 @@ impl Store {
 
         fs::write(
             &path,
-            Self::serialize(&title, &tags, &existing.created_at, &content),
+            Self::serialize(title.as_deref(), &tags, &existing.created_at, &content),
         )
         .await
         .map_err(StoreError::Io)?;
@@ -360,9 +357,3 @@ pub fn slugify(s: &str) -> String {
         .join("-")
 }
 
-fn stem_from_path(rel_path: &str) -> String {
-    Path::new(rel_path)
-        .file_stem()
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_else(|| rel_path.to_string())
-}
