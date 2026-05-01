@@ -19,6 +19,7 @@
 /// - `POST   /api/dirs`                — create directory
 pub mod admin;
 pub mod auth;
+pub mod export;
 pub mod files;
 pub mod oidc;
 pub mod user;
@@ -63,6 +64,11 @@ pub fn router(state: AppState, static_dir: Option<String>) -> Router {
     let dir_routes = Router::new()
         .route("/dirs/{*path}", post(files::create_dir));
 
+    let export_routes = Router::new()
+        .route("/export/file/{*path}", get(export::export_file))
+        .route("/export/dir", get(export::export_dir_root))
+        .route("/export/dir/{*path}", get(export::export_dir));
+
     let api = Router::new()
         .nest("/auth", auth_routes)
         .merge(user_routes)
@@ -70,7 +76,8 @@ pub fn router(state: AppState, static_dir: Option<String>) -> Router {
         .merge(entry_routes)
         .merge(file_routes)
         .merge(content_routes)
-        .merge(dir_routes);
+        .merge(dir_routes)
+        .merge(export_routes);
 
     let base = Router::new()
         .nest("/api", api)

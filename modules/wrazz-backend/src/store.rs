@@ -320,6 +320,61 @@ impl Store {
         fs::create_dir_all(&path).await.map_err(StoreError::Io)
     }
 
+    /// Returns the raw bytes of the file at `rel_path`, exactly as stored on disk.
+    pub async fn read_raw(&self, rel_path: &str) -> StoreResult<Vec<u8>> {
+        let path = self.full_path(rel_path);
+        fs::read(&path).await.map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                StoreError::NotFound { path: rel_path.to_string() }
+            } else {
+                StoreError::Io(e)
+            }
+        })
+    }
+
+    /// Recursively collects the rel-paths of all `.md` files under `rel_path`.
+    ///
+    /// Uses an iterative DFS (explicit stack) to avoid async recursion boxing.
+    /// `rel_path` is relative to `data_dir`; use `""` for the workspace root.
+    pub async fn walk_files(&self, rel_path: &str) -> StoreResult<Vec<String>> {
+        let mut result = Vec::new();
+        let mut dirs: Vec<String> = vec![rel_path.to_string()];
+
+        while let Some(dir) = dirs.pop() {
+            let dir_fs = if dir.is_empty() {
+                self.data_dir.clone()
+            } else {
+                self.full_path(&dir)
+            };
+
+            let mut reader = fs::read_dir(&dir_fs).await.map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    StoreError::NotFound { path: dir.clone() }
+                } else {
+                    StoreError::Io(e)
+                }
+            })?;
+
+            while let Some(dirent) = reader.next_entry().await.map_err(StoreError::Io)? {
+                let file_type = dirent.file_type().await.map_err(StoreError::Io)?;
+                let name = dirent.file_name().to_string_lossy().into_owned();
+                let child = if dir.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{}/{}", dir.trim_end_matches('/'), name)
+                };
+                if file_type.is_dir() {
+                    dirs.push(child);
+                } else if file_type.is_file() && name.ends_with(".md") {
+                    result.push(child);
+                }
+            }
+        }
+
+        result.sort();
+        Ok(result)
+    }
+
     /// Renames/moves an entry within this Store's data directory.
     pub async fn rename_entry(&self, from_rel: &str, to_rel: &str) -> StoreResult<()> {
         let src = self.full_path(from_rel);
