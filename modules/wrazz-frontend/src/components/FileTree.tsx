@@ -1,6 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { Entry, createFile, createDir, moveEntry, deleteEntry, listEntries } from "../api/files";
-import { ChevronRight, ChevronDown, FilePlus, FolderPlus, Trash2 } from "../icons";
+import { ChevronRight, ChevronDown, Download, FilePlus, FolderPlus, Trash2 } from "../icons";
+
+function pathToUrl(path: string): string {
+  return path.replace(/^\/|\/$/g, "");
+}
+
+function triggerDownload(url: string) {
+  const a = document.createElement("a");
+  a.href = url;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
 import ConfirmModal from "./modals/ConfirmModal";
 
@@ -239,6 +251,7 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey, wid
   function fileCtxItems(path: string): ContextMenuItem[] {
     return [
       { label: "Rename", onClick: () => startEdit(path) },
+      { label: "Export", onClick: () => triggerDownload(`/api/export/file/${pathToUrl(path)}`) },
       { label: "Delete", danger: true, onClick: () => doDelete(path) },
     ];
   }
@@ -248,6 +261,7 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey, wid
       { label: "New File", onClick: () => doNewFile(path) },
       { label: "New Folder", onClick: () => doNewDir(path) },
       { label: "Rename", onClick: () => startEdit(path) },
+      { label: "Export as zip", onClick: () => triggerDownload(`/api/export/dir/${pathToUrl(path)}`) },
       { label: "Delete", danger: true, onClick: () => doDelete(path) },
     ];
   }
@@ -374,6 +388,9 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey, wid
           </button>
           <button className="btn-icon" onClick={() => doNewDir("/")} aria-label="New folder">
             <FolderPlus />
+          </button>
+          <button className="btn-icon" onClick={() => triggerDownload("/api/export/dir")} aria-label="Export workspace">
+            <Download />
           </button>
         </div>
       </div>
