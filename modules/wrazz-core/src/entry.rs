@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileEntry {
     pub path: String,
-    pub title: String,
+    pub title: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,

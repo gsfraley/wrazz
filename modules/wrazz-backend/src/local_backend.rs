@@ -63,7 +63,7 @@ impl Backend for LocalBackend {
         &self,
         workspace: &str,
         path: &str,
-        title: String,
+        title: Option<String>,
         tags: Vec<String>,
         content: String,
     ) -> BackendResult<FileEntry> {
@@ -75,7 +75,7 @@ impl Backend for LocalBackend {
         &self,
         workspace: &str,
         path: &str,
-        title: String,
+        title: Option<String>,
         tags: Vec<String>,
         content: String,
     ) -> BackendResult<FileEntry> {

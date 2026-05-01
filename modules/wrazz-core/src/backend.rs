@@ -47,7 +47,7 @@ pub trait Backend: Send + Sync {
         &self,
         workspace: &str,
         path: &str,
-        title: String,
+        title: Option<String>,
         tags: Vec<String>,
         content: String,
     ) -> BackendResult<FileEntry>;
@@ -57,7 +57,7 @@ pub trait Backend: Send + Sync {
         &self,
         workspace: &str,
         path: &str,
-        title: String,
+        title: Option<String>,
         tags: Vec<String>,
         content: String,
     ) -> BackendResult<FileEntry>;
