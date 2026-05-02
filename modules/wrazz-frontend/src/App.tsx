@@ -6,6 +6,7 @@ import FileTree from "./components/FileTree";
 import Editor, { Draft } from "./components/Editor";
 import StatusBar from "./components/StatusBar";
 import LoginPage from "./components/LoginPage";
+import { getDraft, saveDraft, clearDraft, getAllDraftPaths } from "./lib/drafts";
 
 // ── Title helpers ──────────────────────────────────────────────────────────
 
@@ -28,7 +29,13 @@ export default function App() {
   const [activePath, setActivePath] = useState<string | null>(null);
   const [activeFile, setActiveFile] = useState<FileEntry | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [draftPaths, setDraftPaths] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<AppStatus | null>(null);
+
+  const activePathRef = useRef<string | null>(null);
+  activePathRef.current = activePath;
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
   const dragState = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -59,6 +66,9 @@ export default function App() {
     getCurrentUser()
       .then((u) => setUser(u))
       .finally(() => setAuthChecked(true));
+    getAllDraftPaths()
+      .then((paths) => setDraftPaths(new Set(paths)))
+      .catch(() => {});
   }, []);
 
   function reload() {
@@ -67,17 +77,37 @@ export default function App() {
 
   async function handleOpen(path: string) {
     try {
-      const [file, { content }] = await Promise.all([
+      const [file, { content }, stored] = await Promise.all([
         getFile(path),
         getFileContent(path),
+        getDraft(path),
       ]);
       setActivePath(path);
       setActiveFile(file);
-      setDraft({ title: file.title ?? "", content, tags: file.tags });
+      if (stored) {
+        setDraft({ title: stored.title, content: stored.content, tags: stored.tags });
+        setIsDirty(true);
+      } else {
+        setDraft({ title: file.title ?? "", content, tags: file.tags });
+        setIsDirty(false);
+      }
       setStatus(null);
     } catch {
       setStatus({ kind: "error", message: "Could not load file." });
     }
+  }
+
+  function handleChange(newDraft: Draft) {
+    setDraft(newDraft);
+    setIsDirty(true);
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
+      const path = activePathRef.current;
+      if (path) {
+        saveDraft(path, newDraft.title, newDraft.content, newDraft.tags).catch(() => {});
+        setDraftPaths((prev) => prev.has(path) ? prev : new Set([...prev, path]));
+      }
+    }, 500);
   }
 
   async function handleSave() {
@@ -85,6 +115,9 @@ export default function App() {
     try {
       const updated = await updateFile(activePath, draft.title.trim() || null, draft.tags, draft.content);
       setActiveFile(updated);
+      await clearDraft(activePath);
+      setIsDirty(false);
+      setDraftPaths((prev) => { const s = new Set(prev); s.delete(activePath); return s; });
       reload();
       setStatus({ kind: "ok", message: "Saved" });
     } catch {
@@ -92,12 +125,21 @@ export default function App() {
     }
   }
 
+  async function handleDiscard() {
+    if (!activePath) return;
+    await clearDraft(activePath);
+    await handleOpen(activePath);
+  }
+
   function handleTreeDeleted(path: string) {
     if (!activePath) return;
     if (activePath === path || activePath.startsWith(path)) {
+      clearDraft(path).catch(() => {});
+      setDraftPaths((prev) => { const s = new Set(prev); s.delete(path); return s; });
       setActivePath(null);
       setActiveFile(null);
       setDraft(null);
+      setIsDirty(false);
     }
   }
 
@@ -107,6 +149,7 @@ export default function App() {
     setActivePath(null);
     setActiveFile(null);
     setDraft(null);
+    setIsDirty(false);
     setStatus(null);
   }
 
@@ -125,14 +168,17 @@ export default function App() {
           onDeleted={handleTreeDeleted}
           reloadKey={reloadKey}
           width={sidebarWidth}
+          draftPaths={draftPaths}
         />
         <div className="sidebar-resizer" onMouseDown={onResizerMouseDown} />
         <Editor
           file={activeFile}
           draft={draft}
           activePath={activePath}
-          onChange={setDraft}
+          isDirty={isDirty}
+          onChange={handleChange}
           onSave={handleSave}
+          onDiscard={handleDiscard}
           user={user}
           onLogout={handleLogout}
           onUserUpdated={setUser}

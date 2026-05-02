@@ -22,6 +22,7 @@ interface Props {
   onDeleted: (path: string) => void;
   reloadKey: number;
   width: number;
+  draftPaths: Set<string>;
 }
 
 interface CtxState {
@@ -54,7 +55,7 @@ function sortedEntries(entries: Entry[]): Entry[] {
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export default function FileTree({ activePath, onOpen, onDeleted, reloadKey, width }: Props) {
+export default function FileTree({ activePath, onOpen, onDeleted, reloadKey, width, draftPaths }: Props) {
   const [root, setRoot] = useState<Entry[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [children, setChildren] = useState<Map<string, Entry[]>>(new Map());
@@ -366,6 +367,7 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey, wid
           ) : (
             <>
               <span className="tree-name">{entryName(entry.path)}</span>
+              {draftPaths.has(entry.path) && <span className="tree-draft-dot" />}
               <span className="tree-actions">
                 <button className="btn-icon btn-icon--danger" onClick={(e) => { e.stopPropagation(); doDeleteConfirm(entry.path); }} aria-label="Delete file">
                   <Trash2 size={13} />

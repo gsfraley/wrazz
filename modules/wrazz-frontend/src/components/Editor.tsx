@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { FileEntry } from "../api/files";
 import { CurrentUser } from "../api/auth";
 import { WrazzEditor } from "wrazz-editor";
-import { Save } from "../icons";
+import { Save, RotateCcw } from "../icons";
 import ProfileModal from "./modals/ProfileModal";
 import AdminModal from "./modals/AdminModal";
 import { pathToDisplayTitle } from "../App";
@@ -19,8 +19,10 @@ interface Props {
   file: FileEntry | null;
   draft: Draft | null;
   activePath: string | null;
+  isDirty: boolean;
   onChange: (draft: Draft) => void;
   onSave: () => void;
+  onDiscard: () => void;
   user: CurrentUser;
   onLogout: () => void;
   onUserUpdated: (user: CurrentUser) => void;
@@ -30,8 +32,10 @@ export default function Editor({
   file,
   draft,
   activePath,
+  isDirty,
   onChange,
   onSave,
+  onDiscard,
   user,
   onLogout,
   onUserUpdated,
@@ -44,8 +48,15 @@ export default function Editor({
     setModal(m);
   }
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+      e.preventDefault();
+      onSave();
+    }
+  }
+
   return (
-    <main className="editor">
+    <main className="editor" onKeyDown={handleKeyDown}>
       <div className="editor-header">
         <details ref={menuRef} className="user-menu">
           <summary className="user-menu-trigger">{user.display_name}</summary>
@@ -70,6 +81,9 @@ export default function Editor({
         <AdminModal onClose={() => setModal(null)} currentUserId={user.id} />
       )}
 
+      <div className={`editor-unsaved-bar${isDirty && file ? " is-dirty" : ""}`}>
+        {isDirty && file && <span className="editor-unsaved-msg">Unsaved changes</span>}
+      </div>
       {!file || !draft ? (
         <div className="editor-empty">Select a file or create a new one.</div>
       ) : (
@@ -88,6 +102,11 @@ export default function Editor({
             placeholder="Start writing…"
           />
           {/* After WrazzEditor in DOM so tab order is: title → editor → save */}
+          {isDirty && (
+            <button className="btn-icon editor-discard-btn" onClick={onDiscard} aria-label="Discard changes">
+              <RotateCcw size={14} />
+            </button>
+          )}
           <button className="btn-icon editor-save-btn" onClick={onSave} aria-label="Save">
             <Save />
           </button>

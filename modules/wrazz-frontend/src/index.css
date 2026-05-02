@@ -193,6 +193,18 @@ body {
   text-overflow: ellipsis;
 }
 
+.tree-draft-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex-shrink: 0;
+}
+
+.tree-row:hover .tree-draft-dot {
+  display: none;
+}
+
 /* Inline row actions: hidden until the row is hovered */
 .tree-actions {
   display: none;
@@ -252,6 +264,58 @@ body {
   overflow-y: auto;
 }
 
+/* ── Unsaved-changes bar ──────────────────────────────────────── */
+
+/* Always occupies 12px so opening/closing it causes no layout shift.
+   The 12px is half of the reduction from editor-title-row's padding-top (32→8). */
+.editor-unsaved-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 12px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Stripe layer — hidden until .is-dirty, fades top→bottom */
+.editor-unsaved-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    color-mix(in srgb, var(--paper-sidebar), var(--paper-topbar) 35%) 6px,
+    color-mix(in srgb, var(--paper-sidebar), var(--paper-topbar) 35%) 12px
+  );
+  mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.editor-unsaved-bar.is-dirty::before {
+  opacity: 1;
+}
+
+/* Text centered — wide horizontal padding feeds the radial halo,
+   sharp stop keeps the edges crisp rather than bleeding into the stripes */
+.editor-unsaved-msg {
+  position: relative;
+  z-index: 1;
+  font-size: 9px;
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--border);
+  padding: 0 36px;
+  background: radial-gradient(ellipse at center, var(--paper) 58%, transparent 66%);
+}
+
 .editor-empty {
   flex: 1;
   display: flex;
@@ -270,9 +334,15 @@ body {
   position: relative;
 }
 
+.editor-discard-btn {
+  position: absolute;
+  top: 20px;
+  right: 44px;
+}
+
 .editor-save-btn {
   position: absolute;
-  top: 32px;
+  top: 20px;
   right: 16px;
 }
 
@@ -281,7 +351,7 @@ body {
 .editor-title-row {
   display: flex;
   align-items: baseline;
-  padding: 32px 16px 8px calc(var(--we-margin) - 12px);
+  padding: 20px 16px 8px calc(var(--we-margin) - 12px);
   flex-shrink: 0;
 }
 
@@ -294,8 +364,8 @@ body {
   background: transparent;
   outline: none;
   min-width: 0;
-  /* Leave room for the absolutely-positioned save button */
-  padding-right: 40px;
+  /* Leave room for the absolutely-positioned save (+ optional discard) buttons */
+  padding-right: 72px;
 }
 
 .editor-title::placeholder {
