@@ -3,10 +3,16 @@ import { FileEntry, getFile, getFileContent, updateFile } from "./api/files";
 import { CurrentUser, getCurrentUser, logout } from "./api/auth";
 import { AppStatus } from "./types";
 import FileTree from "./components/FileTree";
+import type { FileTreeHandle } from "./components/FileTree";
 import Editor, { Draft } from "./components/Editor";
+import CommandBar from "./components/CommandBar";
 import StatusBar from "./components/StatusBar";
 import LoginPage from "./components/LoginPage";
 import { getDraft, saveDraft, clearDraft, getAllDraftPaths } from "./lib/drafts";
+import { ActiveContextCtx } from "./lib/context";
+import type { ActionContext } from "./lib/actions";
+import { registerAction } from "./lib/actions";
+import { Save, RotateCcw, FilePlus, FolderPlus, Download } from "./icons";
 
 // ── Title helpers ──────────────────────────────────────────────────────────
 
@@ -36,6 +42,13 @@ export default function App() {
   const activePathRef = useRef<string | null>(null);
   activePathRef.current = activePath;
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [activeCtx, setActiveCtx] = useState<ActionContext | null>(null);
+  const fileTreeRef = useRef<FileTreeHandle>(null);
+
+  // Stable handler refs — updated each render so action closures never go stale
+  const handleSaveRef = useRef<() => void>(() => {});
+  const handleDiscardRef = useRef<() => void>(() => {});
 
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
   const dragState = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -153,6 +166,75 @@ export default function App() {
     setStatus(null);
   }
 
+  // Keep handler refs current every render
+  handleSaveRef.current = handleSave;
+  handleDiscardRef.current = handleDiscard;
+
+  // Register palette actions once on mount; refs keep handlers fresh
+  useEffect(() => {
+    function triggerDownload(url: string) {
+      const a = document.createElement("a");
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    const unregs = [
+      registerAction({
+        id: "core:save",
+        label: "Save",
+        keywords: ["save", "write"],
+        icon: Save,
+        contexts: ["editor"],
+        handler: () => handleSaveRef.current(),
+      }),
+      registerAction({
+        id: "core:discard",
+        label: "Discard changes",
+        keywords: ["discard", "revert", "reset"],
+        icon: RotateCcw,
+        contexts: ["editor"],
+        handler: () => handleDiscardRef.current(),
+      }),
+      registerAction({
+        id: "core:new-file",
+        label: "New file",
+        keywords: ["create", "file", "new"],
+        icon: FilePlus,
+        contexts: ["file-tree"],
+        handler: () => fileTreeRef.current?.newFile(),
+      }),
+      registerAction({
+        id: "core:new-folder",
+        label: "New folder",
+        keywords: ["create", "folder", "directory", "new"],
+        icon: FolderPlus,
+        contexts: ["file-tree"],
+        handler: () => fileTreeRef.current?.newDir(),
+      }),
+      registerAction({
+        id: "core:export-file",
+        label: "Export file",
+        keywords: ["export", "download"],
+        icon: Download,
+        contexts: ["editor"],
+        handler: () => {
+          const p = activePathRef.current;
+          if (p) triggerDownload(`/api/export/file/${p.replace(/^\/|\/$/g, "")}`);
+        },
+      }),
+      registerAction({
+        id: "core:export-workspace",
+        label: "Export workspace",
+        keywords: ["export", "download", "zip", "all"],
+        icon: Download,
+        handler: () => triggerDownload("/api/export/dir"),
+      }),
+    ];
+    return () => unregs.forEach((f) => f());
+  }, []);
+
   if (!authChecked) return null;
 
   if (!user) {
@@ -160,31 +242,42 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <div className="workspace">
-        <FileTree
-          activePath={activePath}
-          onOpen={handleOpen}
-          onDeleted={handleTreeDeleted}
-          reloadKey={reloadKey}
-          width={sidebarWidth}
-          draftPaths={draftPaths}
-        />
-        <div className="sidebar-resizer" onMouseDown={onResizerMouseDown} />
-        <Editor
-          file={activeFile}
-          draft={draft}
-          activePath={activePath}
-          isDirty={isDirty}
-          onChange={handleChange}
-          onSave={handleSave}
-          onDiscard={handleDiscard}
-          user={user}
-          onLogout={handleLogout}
-          onUserUpdated={setUser}
-        />
+    <ActiveContextCtx.Provider value={{ ctx: activeCtx, setCtx: setActiveCtx }}>
+      <div className="app">
+        <div className="workspace">
+          <FileTree
+            ref={fileTreeRef}
+            activePath={activePath}
+            onOpen={handleOpen}
+            onDeleted={handleTreeDeleted}
+            reloadKey={reloadKey}
+            width={sidebarWidth}
+            draftPaths={draftPaths}
+          />
+          <div className="sidebar-resizer" onMouseDown={onResizerMouseDown} />
+          <div className="editor-column">
+            <CommandBar
+              user={user}
+              onLogout={handleLogout}
+              onUserUpdated={setUser}
+              onOpenFile={handleOpen}
+              reloadKey={reloadKey}
+              hasActiveFile={activeFile !== null}
+              isDirty={isDirty}
+              editorTitle={draft?.title || (activePath ? pathToDisplayTitle(activePath) : null)}
+            />
+            <Editor
+              file={activeFile}
+              draft={draft}
+              activePath={activePath}
+              isDirty={isDirty}
+              onChange={handleChange}
+              onSave={handleSave}
+            />
+          </div>
+        </div>
+        <StatusBar title={draft?.title || (activePath ? pathToDisplayTitle(activePath) : null)} status={status} />
       </div>
-      <StatusBar title={draft?.title || (activePath ? pathToDisplayTitle(activePath) : null)} status={status} />
-    </div>
+    </ActiveContextCtx.Provider>
   );
 }
