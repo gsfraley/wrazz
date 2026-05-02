@@ -1,10 +1,6 @@
-import { useRef, useState } from "react";
 import { FileEntry } from "../api/files";
-import { CurrentUser } from "../api/auth";
 import { WrazzEditor } from "wrazz-editor";
-import { Save, RotateCcw } from "../icons";
-import ProfileModal from "./modals/ProfileModal";
-import AdminModal from "./modals/AdminModal";
+import { useActiveContext } from "../lib/context";
 import { pathToDisplayTitle } from "../App";
 
 export interface Draft {
@@ -13,8 +9,6 @@ export interface Draft {
   tags: string[];
 }
 
-type Modal = "profile" | "admin" | null;
-
 interface Props {
   file: FileEntry | null;
   draft: Draft | null;
@@ -22,10 +16,6 @@ interface Props {
   isDirty: boolean;
   onChange: (draft: Draft) => void;
   onSave: () => void;
-  onDiscard: () => void;
-  user: CurrentUser;
-  onLogout: () => void;
-  onUserUpdated: (user: CurrentUser) => void;
 }
 
 export default function Editor({
@@ -35,18 +25,8 @@ export default function Editor({
   isDirty,
   onChange,
   onSave,
-  onDiscard,
-  user,
-  onLogout,
-  onUserUpdated,
 }: Props) {
-  const menuRef = useRef<HTMLDetailsElement>(null);
-  const [modal, setModal] = useState<Modal>(null);
-
-  function openModal(m: Modal) {
-    if (menuRef.current) menuRef.current.open = false;
-    setModal(m);
-  }
+  const { setCtx } = useActiveContext();
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key === "s") {
@@ -56,30 +36,7 @@ export default function Editor({
   }
 
   return (
-    <main className="editor" onKeyDown={handleKeyDown}>
-      <div className="editor-header">
-        <details ref={menuRef} className="user-menu">
-          <summary className="user-menu-trigger">{user.display_name}</summary>
-          <div className="user-menu-dropdown">
-            <button onClick={() => openModal("profile")}>Profile</button>
-            {user.is_admin && (
-              <button onClick={() => openModal("admin")}>Administration</button>
-            )}
-            <div className="user-menu-divider" />
-            <button onClick={onLogout}>Sign out</button>
-          </div>
-        </details>
-      </div>
-      {modal === "profile" && (
-        <ProfileModal
-          user={user}
-          onClose={() => setModal(null)}
-          onUpdated={(u) => { onUserUpdated(u); }}
-        />
-      )}
-      {modal === "admin" && (
-        <AdminModal onClose={() => setModal(null)} currentUserId={user.id} />
-      )}
+    <main className="editor" onKeyDown={handleKeyDown} onClick={() => setCtx("editor")}>
 
       <div className={`editor-unsaved-bar${isDirty && file ? " is-dirty" : ""}`}>
         {isDirty && file && <span className="editor-unsaved-msg">Unsaved changes</span>}
@@ -101,15 +58,6 @@ export default function Editor({
             onChange={(content) => onChange({ ...draft, content })}
             placeholder="Start writing…"
           />
-          {/* After WrazzEditor in DOM so tab order is: title → editor → save */}
-          {isDirty && (
-            <button className="btn-icon editor-discard-btn" onClick={onDiscard} aria-label="Discard changes">
-              <RotateCcw size={14} />
-            </button>
-          )}
-          <button className="btn-icon editor-save-btn" onClick={onSave} aria-label="Save">
-            <Save />
-          </button>
         </div>
       )}
     </main>

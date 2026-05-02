@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { Entry, createFile, createDir, moveEntry, deleteEntry, listEntries } from "../api/files";
-import { ChevronRight, ChevronDown, Download, FilePlus, FolderPlus, Trash2 } from "../icons";
+import { ChevronRight, ChevronDown, Download, FilePlus, FolderPlus, Trash2, Menu } from "../icons";
+import { useActiveContext } from "../lib/context";
 
 function pathToUrl(path: string): string {
   return path.replace(/^\/|\/$/g, "");
@@ -15,6 +16,11 @@ function triggerDownload(url: string) {
 }
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
 import ConfirmModal from "./modals/ConfirmModal";
+
+export interface FileTreeHandle {
+  newFile: (parentPath?: string) => void;
+  newDir: (parentPath?: string) => void;
+}
 
 interface Props {
   activePath: string | null;
@@ -55,7 +61,10 @@ function sortedEntries(entries: Entry[]): Entry[] {
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export default function FileTree({ activePath, onOpen, onDeleted, reloadKey, width, draftPaths }: Props) {
+const FileTree = forwardRef<FileTreeHandle, Props>(function FileTree(
+  { activePath, onOpen, onDeleted, reloadKey, width, draftPaths },
+  ref,
+) {
   const [root, setRoot] = useState<Entry[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [children, setChildren] = useState<Map<string, Entry[]>>(new Map());
@@ -65,10 +74,18 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey, wid
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
   const [ctx, setCtx] = useState<CtxState | null>(null);
   const [confirmPath, setConfirmPath] = useState<string | null>(null);
+  const [wsMenuOpen, setWsMenuOpen] = useState(false);
 
   const editInputRef = useRef<HTMLInputElement>(null);
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
+
+  const { setCtx: setActivePane } = useActiveContext();
+
+  useImperativeHandle(ref, () => ({
+    newFile: (parentPath = "/") => doNewFile(parentPath),
+    newDir: (parentPath = "/") => doNewDir(parentPath),
+  }));
 
   useEffect(() => {
     const input = editInputRef.current;
@@ -381,19 +398,34 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey, wid
   }
 
   return (
-    <aside className="sidebar" style={{ width }}>
+    <aside className="sidebar" style={{ width }} onClick={() => setActivePane("file-tree")}>
       <div className="sidebar-header">
-        <span className="sidebar-heading">Files</span>
-        <div className="sidebar-header-actions">
-          <button className="btn-icon" onClick={() => doNewFile("/")} aria-label="New file">
-            <FilePlus />
+        <span className="sidebar-heading">Workspace</span>
+        <div className="sidebar-menu">
+          <button
+            className="sidebar-menu-btn"
+            onClick={() => setWsMenuOpen((o) => !o)}
+            aria-label="Workspace menu"
+          >
+            <Menu size={14} />
           </button>
-          <button className="btn-icon" onClick={() => doNewDir("/")} aria-label="New folder">
-            <FolderPlus />
-          </button>
-          <button className="btn-icon" onClick={() => triggerDownload("/api/export/dir")} aria-label="Export workspace">
-            <Download />
-          </button>
+          {wsMenuOpen && (
+            <>
+              <div className="sidebar-menu-backdrop" onMouseDown={() => setWsMenuOpen(false)} />
+              <div className="sidebar-menu-dropdown">
+                <button className="sidebar-menu-item" onClick={() => { doNewFile("/"); setWsMenuOpen(false); }}>
+                  <FilePlus size={13} /> New file
+                </button>
+                <button className="sidebar-menu-item" onClick={() => { doNewDir("/"); setWsMenuOpen(false); }}>
+                  <FolderPlus size={13} /> New folder
+                </button>
+                <hr className="sidebar-menu-divider" />
+                <button className="sidebar-menu-item" onClick={() => { triggerDownload("/api/export/dir"); setWsMenuOpen(false); }}>
+                  <Download size={13} /> Export workspace
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
       <div
@@ -433,4 +465,6 @@ export default function FileTree({ activePath, onOpen, onDeleted, reloadKey, wid
       )}
     </aside>
   );
-}
+});
+
+export default FileTree;
