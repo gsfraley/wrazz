@@ -1,0 +1,51 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <title>wrazz</title>
+
+  <!--
+    Italic monospace w — uniform stroke width throughout.
+    Scaled ×1.15 from center (256,256) vs original squircle-inset version.
+
+    Three top points:
+      LT = (97, 140)    ← flat serif here
+      MT = (263, 140)   ← flat serif here
+      RT = (429, 140)   ← i-dot circle above
+
+    Two valleys with smooth round bottoms (cubic bezier):
+      V1 ≈ (178, 419)   ← first under-hump; em-dash below
+      V2 ≈ (322, 419)   ← second under-hump
+
+    Bezier geometry:
+      Straight strokes transition into curves at y=297 (157px above each valley).
+      Control points are aligned to the incoming/outgoing stroke directions so the
+      curve meets the straight segment with no kink (C1 continuous).
+
+      V1 entry  (148, 297) → C 188,422 167,419 → V1 exit (209, 297)
+      V2 entry  (314, 297) → C 354,422 333,419 → V2 exit (374, 297)
+  -->
+  <path
+    d="M 97,140
+       L 148,297
+       C 188,422 167,419 209,297
+       L 263,140
+       L 314,297
+       C 354,422 333,419 374,297
+       L 429,140"
+    fill="none"
+    stroke="#323228"
+    stroke-width="28"
+    stroke-linecap="butt"
+    stroke-linejoin="bevel"
+  />
+
+  <!-- Flat serif at LT (first top point, x=97) -->
+  <rect x="57" y="131" width="80" height="14" fill="#323228"/>
+
+  <!-- Flat serif at MT (second top point, x=263) -->
+  <rect x="223" y="131" width="80" height="14" fill="#323228"/>
+
+  <!-- i-dot above RT (third top point, x=429) -->
+  <circle cx="429" cy="97" r="20" fill="#323228"/>
+
+  <!-- Em-dash below the first under-hump (centered at V1 x≈178) -->
+  <rect x="121" y="416" width="114" height="14" fill="#323228"/>
+</svg>
