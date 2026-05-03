@@ -4,6 +4,8 @@
 
 A local-first writing app for notes and journaling. Plain Markdown files on disk, a clean paper-feel editor in the browser.
 
+<p align="center"><img src="./docs/pics/lorem-v0-1-5.png" width="60%"></p>
+
 <br clear="left">
 
 ---
@@ -15,6 +17,8 @@ wrazz stores everything as Markdown files in a directory you point it at. No syn
 The interface is VSCode's artsy cousin: same structural chrome (file sidebar, status bar), but serif fonts and a warm paper palette instead of a code editor aesthetic.
 
 In multi-user server mode, each user gets their own isolated directory and logs in with a password or via OIDC (Authentik or any other provider).
+
+Read more about the [design](./docs/design.md) if you're interested!
 
 ## Architecture
 
