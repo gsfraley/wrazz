@@ -2,7 +2,7 @@
 
 # wrazz
 
-A local-first writing app for notes and journaling. Plain Markdown files on disk, a clean paper-feel editor in the browser.
+A distributed writing app for notes and journaling. Plain Markdown files on disk, a clean paper-feel editor in the browser.
 
 <p align="center"><img src="./docs/pics/lorem-v0-1-5.png" width="60%"></p>
 
