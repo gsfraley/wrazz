@@ -16,7 +16,7 @@ function markHtml(depth: number): string {
 
 export const heading: ContentPlugin = {
   name: "heading",
-  interaction: { kind: "line-prefix", pattern: /^(#{1,6}) /, activation: "line-mark" },
+  interaction: { kind: "line-prefix", pattern: /^(#+) /, activation: "line-mark" },
 
   extract(el: Element): string {
     let mark = "";
@@ -45,7 +45,7 @@ export const heading: ContentPlugin = {
   },
 
   transformLine(line, isCaretLine, _caretCol) {
-    const m = line.match(/^(#{1,6})([^# \n])/);
+    const m = line.match(/^(#+)([^# \n])/);
     if (!m) return null;
     return {
       line: m[1] + " " + line.slice(m[1].length),
@@ -60,12 +60,11 @@ export const heading: ContentPlugin = {
     const lines = value.split("\n");
     const { line, col } = getCursor();
     const lineText = lines[line] ?? "";
-    const m = lineText.match(/^(#{1,6}) /);
+    const m = lineText.match(/^(#+) /);
     if (!m) return false;
     const depth = m[1].length;
 
     if (e.key === "#") {
-      if (depth >= 6) return true; // consume, clamp at 6
       lines[line] = "#".repeat(depth + 1) + " " + lineText.slice(m[0].length);
       setValue(lines.join("\n"));
       setCursor({ line, col });
@@ -89,7 +88,7 @@ export const heading: ContentPlugin = {
     if (e.key === "ArrowLeft") {
       if (line > 0) {
         const prevText = lines[line - 1] ?? "";
-        const prevM = prevText.match(/^(#{1,6}) /);
+        const prevM = prevText.match(/^(#+) /);
         const prevLen = prevM
           ? prevText.slice(prevM[0].length).length
           : prevText.length;
