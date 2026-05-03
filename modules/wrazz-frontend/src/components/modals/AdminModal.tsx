@@ -58,7 +58,7 @@ function InfoPage() {
   return (
     <div className="admin-info">
       <p className="admin-info-name">wrazz</p>
-      <p className="admin-info-version">version 0.1.2</p>
+      <p className="admin-info-version">version 0.1.6</p>
       <p className="admin-info-desc">
         Self-hosted personal journal built around plain Markdown files.
       </p>

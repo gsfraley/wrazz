@@ -1,4 +1,4 @@
-<img src="icon-wip.svg" width="64" align="left" style="margin-right: 16px">
+<img src="./resources/icon-with-bg.svg" width="64" align="left" style="margin-right: 16px">
 
 # wrazz
 
