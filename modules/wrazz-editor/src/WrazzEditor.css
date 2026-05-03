@@ -20,7 +20,7 @@
 /* ── Editor ───────────────────────────────────────────────────── */
 
 .we-editor {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: 'Libre Baskerville', Georgia, serif;
   font-size: 15px;
   line-height: 1.8;
   /* Top/right/bottom padding. Left is controlled per-line (see below). */
