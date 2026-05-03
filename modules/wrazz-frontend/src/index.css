@@ -370,7 +370,13 @@ body {
 }
 
 .command-input-wrap.is-open {
-  border-color: var(--ink-muted);
+  border-width: 1px;
+  border-style: solid;
+  border-top-color: var(--border-strong);
+  border-right-color: var(--border-strong);
+  border-left-color: var(--border-strong);
+  border-bottom-color: transparent;
+  border-radius: 5px 5px 0 0;
 }
 
 .command-input-search-icon {
