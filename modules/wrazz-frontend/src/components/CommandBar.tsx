@@ -105,9 +105,8 @@ export default function CommandBar({
 
   function openPalette() {
     if (commandBarRef.current && inputWrapRef.current) {
-      const barRect = commandBarRef.current.getBoundingClientRect();
       const wrapRect = inputWrapRef.current.getBoundingClientRect();
-      setDropdownPos({ top: barRect.bottom, left: wrapRect.left, width: wrapRect.width });
+      setDropdownPos({ top: wrapRect.bottom, left: wrapRect.left, width: wrapRect.width });
     }
     listAllFilePaths("/").then(setAllFiles).catch(() => {});
     setOpen(true);
@@ -147,10 +146,10 @@ export default function CommandBar({
       const editorActions = hasActiveFile
         ? actions.filter((a) => a.contexts?.includes("editor"))
         : [];
-      const otherActions = actions.filter((a) => !hasActiveFile || !a.contexts?.includes("editor"));
+      const otherActions = actions.filter((a) => !a.contexts?.includes("editor"));
       const result: Section[] = [];
       if (editorActions.length > 0) {
-        result.push({ label: "Relevant now", items: editorActions.map((a) => ({ kind: "action", action: a })) });
+        result.push({ label: null, items: editorActions.map((a) => ({ kind: "action", action: a })) });
       }
       if (otherActions.length > 0) {
         result.push({ label: null, items: otherActions.map((a) => ({ kind: "action", action: a })) });
