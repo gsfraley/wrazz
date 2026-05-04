@@ -3,6 +3,8 @@ import { CurrentUser } from "../api/auth";
 import { listEntries } from "../api/files";
 import { useActiveContext } from "../lib/context";
 import { getActions } from "../lib/actions";
+import { useContextMenu } from "../lib/contextMenu";
+import type { ContextMenuItem } from "./ContextMenu";
 import type { Action } from "../lib/actions";
 import { Search } from "../icons";
 import { pathToDisplayTitle } from "../App";
@@ -81,7 +83,6 @@ export default function CommandBar({
   isDirty,
   editorTitle,
 }: Props) {
-  const menuRef = useRef<HTMLDetailsElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const inputWrapRef = useRef<HTMLDivElement>(null);
   const commandBarRef = useRef<HTMLDivElement>(null);
@@ -93,13 +94,13 @@ export default function CommandBar({
   const [dropdownPos, setDropdownPos] = useState<DropdownPos | null>(null);
 
   const { ctx } = useActiveContext();
+  const openCtx = useContextMenu();
 
   useEffect(() => {
     listAllFilePaths("/").then(setAllFiles).catch(() => {});
   }, [reloadKey]);
 
   function openModal(m: Modal) {
-    if (menuRef.current) menuRef.current.open = false;
     setModal(m);
   }
 
@@ -250,17 +251,22 @@ export default function CommandBar({
         </div>
 
         {/* User menu on the right */}
-        <details ref={menuRef} className="user-menu">
-          <summary className="user-menu-trigger">{user.display_name}</summary>
-          <div className="user-menu-dropdown">
-            <button onClick={() => openModal("profile")}>Profile</button>
-            {user.is_admin && (
-              <button onClick={() => openModal("admin")}>Administration</button>
-            )}
-            <div className="user-menu-divider" />
-            <button onClick={onLogout}>Sign out</button>
-          </div>
-        </details>
+        <div className="user-menu">
+          <button
+            className="user-menu-trigger"
+            onClick={(e) => {
+              const items: ContextMenuItem[] = [
+                { type: "item", label: "Profile", onClick: () => openModal("profile") },
+                ...(user.is_admin ? [{ type: "item" as const, label: "Administration", onClick: () => openModal("admin") }] : []),
+                { type: "separator" },
+                { type: "item", label: "Sign out", onClick: onLogout },
+              ];
+              openCtx(e, items, "top-to-element-bottom", "right-to-element-right");
+            }}
+          >
+            {user.display_name}
+          </button>
+        </div>
       </div>
 
       {/* Transparent backdrop — captures clicks outside to close */}

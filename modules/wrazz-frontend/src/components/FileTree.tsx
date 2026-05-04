@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "re
 import { Entry, createFile, createDir, moveEntry, deleteEntry, listEntries } from "../api/files";
 import { ChevronRight, ChevronDown, Download, FilePlus, FolderPlus, Pencil, Trash2, Menu } from "../icons";
 import { useActiveContext } from "../lib/context";
-import ContextMenu, { ContextMenuItem, ContextMenuProps } from "./ContextMenu";
+import { useContextMenu } from "../lib/contextMenu";
+import type { ContextMenuItem } from "./ContextMenu";
 import ConfirmModal from "./modals/ConfirmModal";
 
 function pathToUrl(path: string): string {
@@ -66,7 +67,6 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
   const [editValue, setEditValue] = useState("");
   const [dragPath, setDragPath] = useState<string | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
-  const [ctx, setCtx] = useState<ContextMenuProps | null>(null);
   const [confirmPath, setConfirmPath] = useState<string | null>(null);
 
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -74,6 +74,7 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
   expandedRef.current = expanded;
 
   const { setCtx: setActivePane } = useActiveContext();
+  const openCtx = useContextMenu();
 
   useImperativeHandle(ref, () => ({
     newFile: (parentPath = "/") => doNewFile(parentPath),
@@ -252,56 +253,6 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
   }
 
   // ── Context menu ──────────────────────────────────────────────────────────
-
-  function openCtx(e: React.MouseEvent, items: ContextMenuItem[],
-      vertical:
-        | "top-to-pointer"
-        | "top-to-element-top" | "top-to-element-bottom"
-        = "top-to-pointer",
-      horizontal:
-        | "left-to-pointer"
-        | "left-to-element-left" | "left-to-element-right"
-        | "right-to-element-left" | "right-to-element-right"
-        = "left-to-pointer"
-  ) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    let ctxVertical;
-    let ctxHorizontal;
-
-    switch (vertical) {
-      case "top-to-pointer":
-        ctxVertical = { top: e.clientY + 4 };
-        break;
-      case "top-to-element-top":
-        ctxVertical = { top: e.currentTarget.getBoundingClientRect().top };
-        break;
-      case "top-to-element-bottom":
-        ctxVertical = { top: e.currentTarget.getBoundingClientRect().bottom };
-        break;
-    }
-
-    switch (horizontal) {
-      case "left-to-pointer":
-        ctxHorizontal = { left: e.clientX - 4 };
-        break;
-      case "left-to-element-left":
-        ctxHorizontal = { left: e.currentTarget.getBoundingClientRect().left };
-        break;
-      case "left-to-element-right":
-        ctxHorizontal = { left: e.currentTarget.getBoundingClientRect().right };
-        break;
-      case "right-to-element-left":
-        ctxHorizontal = { right: e.currentTarget.getBoundingClientRect().left };
-        break;
-      case "right-to-element-right":
-        ctxHorizontal = { right: e.currentTarget.getBoundingClientRect().right };
-        break;
-    }
-
-    setCtx({ vertical: ctxVertical, horizontal: ctxHorizontal, items, onClose: () => setCtx(null) });
-  }
 
   function fileCtxItems(path: string): ContextMenuItem[] {
     return [
@@ -485,9 +436,6 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
           </div>
         )}
       </div>
-      {ctx && (
-        <ContextMenu {...ctx}/>
-      )}
       {confirmPath && (
         <ConfirmModal
           message={`Delete "${entryName(confirmPath)}"?`}

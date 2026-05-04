@@ -12,6 +12,11 @@ import { getDraft, saveDraft, clearDraft, getAllDraftPaths } from "./lib/drafts"
 import { ActiveContextCtx } from "./lib/context";
 import type { ActionContext } from "./lib/actions";
 import { registerAction } from "./lib/actions";
+import { ContextMenuCtx } from "./lib/contextMenu";
+import type { VerticalAnchor, HorizontalAnchor } from "./lib/contextMenu";
+import { assertNever } from "./lib/utils";
+import ContextMenu from "./components/ContextMenu";
+import type { ContextMenuProps, ContextMenuItem } from "./components/ContextMenu";
 import { Save, RotateCcw, FilePlus, FolderPlus, Download } from "./icons";
 
 // ── Title helpers ──────────────────────────────────────────────────────────
@@ -45,6 +50,7 @@ export default function App() {
 
   const [activeCtx, setActiveCtx] = useState<ActionContext | null>(null);
   const fileTreeRef = useRef<FileTreeHandle>(null);
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuProps | null>(null);
 
   // Stable handler refs — updated each render so action closures never go stale
   const handleSaveRef = useRef<() => void>(() => {});
@@ -52,6 +58,30 @@ export default function App() {
 
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
   const dragState = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  function openCtx(
+    e: React.MouseEvent,
+    items: ContextMenuItem[],
+    vertical: VerticalAnchor = "top-to-pointer",
+    horizontal: HorizontalAnchor = "left-to-pointer",
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ctxVertical =
+      vertical === "top-to-pointer"        ? { top: e.clientY + 4 } :
+      vertical === "top-to-element-top"    ? { top: rect.top }      :
+      vertical === "top-to-element-bottom" ? { top: rect.bottom }   :
+      assertNever(vertical);
+    const ctxHorizontal =
+      horizontal === "left-to-pointer"        ? { left: e.clientX - 4 } :
+      horizontal === "left-to-element-left"   ? { left: rect.left }     :
+      horizontal === "left-to-element-right"  ? { left: rect.right }    :
+      horizontal === "right-to-element-left"  ? { right: rect.left }    :
+      horizontal === "right-to-element-right" ? { right: rect.right }   :
+      assertNever(horizontal);
+    setCtxMenu({ vertical: ctxVertical, horizontal: ctxHorizontal, items, onClose: () => setCtxMenu(null) });
+  }
 
   const onResizerMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -242,6 +272,7 @@ export default function App() {
   }
 
   return (
+    <ContextMenuCtx.Provider value={openCtx}>
     <ActiveContextCtx.Provider value={{ ctx: activeCtx, setCtx: setActiveCtx }}>
       <div className="app">
         <div className="workspace">
@@ -277,7 +308,9 @@ export default function App() {
           </div>
         </div>
         <StatusBar title={draft?.title || (activePath ? pathToDisplayTitle(activePath) : null)} status={status} />
+        {ctxMenu && <ContextMenu {...ctxMenu} />}
       </div>
     </ActiveContextCtx.Provider>
+    </ContextMenuCtx.Provider>
   );
 }
