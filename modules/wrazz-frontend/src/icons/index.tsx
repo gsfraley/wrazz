@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-type IconProps = SVGProps<SVGSVGElement> & { size?: number };
+export type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
 const defaults = (size: number): SVGProps<SVGSVGElement> => ({
   width: size,
@@ -12,6 +12,7 @@ const defaults = (size: number): SVGProps<SVGSVGElement> => ({
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
   "aria-hidden": true,
+  className: "we-icon"
 });
 
 export function FilePlus({ size = 16, ...props }: IconProps) {
@@ -107,6 +108,15 @@ export function Menu({ size = 16, ...props }: IconProps) {
       <line x1="4" y1="6" x2="20" y2="6" />
       <line x1="4" y1="12" x2="20" y2="12" />
       <line x1="4" y1="18" x2="20" y2="18" />
+    </svg>
+  );
+}
+
+export function Pencil({ size = 16, ...props }: IconProps) {
+  return (
+    <svg {...defaults(size)} {...props}>
+      <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+      <path d="m15 5 4 4" />
     </svg>
   );
 }

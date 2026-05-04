@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { Entry, createFile, createDir, moveEntry, deleteEntry, listEntries } from "../api/files";
-import { ChevronRight, ChevronDown, Download, FilePlus, FolderPlus, Trash2, Menu } from "../icons";
+import { ChevronRight, ChevronDown, Download, FilePlus, FolderPlus, Pencil, Trash2, Menu } from "../icons";
 import { useActiveContext } from "../lib/context";
+import ContextMenu, { ContextMenuItem, ContextMenuProps } from "./ContextMenu";
+import ConfirmModal from "./modals/ConfirmModal";
 
 function pathToUrl(path: string): string {
   return path.replace(/^\/|\/$/g, "");
@@ -14,27 +16,19 @@ function triggerDownload(url: string) {
   a.click();
   document.body.removeChild(a);
 }
-import ContextMenu, { ContextMenuItem } from "./ContextMenu";
-import ConfirmModal from "./modals/ConfirmModal";
 
 export interface FileTreeHandle {
   newFile: (parentPath?: string) => void;
   newDir: (parentPath?: string) => void;
 }
 
-interface Props {
+interface FileTreeProps {
   activePath: string | null;
   onOpen: (path: string) => void;
   onDeleted: (path: string) => void;
   reloadKey: number;
   width: number;
   draftPaths: Set<string>;
-}
-
-interface CtxState {
-  x: number;
-  y: number;
-  items: ContextMenuItem[];
 }
 
 // ── Path helpers ───────────────────────────────────────────────────────────
@@ -61,7 +55,7 @@ function sortedEntries(entries: Entry[]): Entry[] {
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-const FileTree = forwardRef<FileTreeHandle, Props>(function FileTree(
+const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
   { activePath, onOpen, onDeleted, reloadKey, width, draftPaths },
   ref,
 ) {
@@ -72,9 +66,8 @@ const FileTree = forwardRef<FileTreeHandle, Props>(function FileTree(
   const [editValue, setEditValue] = useState("");
   const [dragPath, setDragPath] = useState<string | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
-  const [ctx, setCtx] = useState<CtxState | null>(null);
+  const [ctx, setCtx] = useState<ContextMenuProps | null>(null);
   const [confirmPath, setConfirmPath] = useState<string | null>(null);
-  const [wsMenuOpen, setWsMenuOpen] = useState(false);
 
   const editInputRef = useRef<HTMLInputElement>(null);
   const expandedRef = useRef(expanded);
@@ -260,34 +253,90 @@ const FileTree = forwardRef<FileTreeHandle, Props>(function FileTree(
 
   // ── Context menu ──────────────────────────────────────────────────────────
 
-  function openCtx(e: React.MouseEvent, items: ContextMenuItem[]) {
+  function openCtx(e: React.MouseEvent, items: ContextMenuItem[],
+      vertical:
+        | "top-to-pointer"
+        | "top-to-element-top" | "top-to-element-bottom"
+        = "top-to-pointer",
+      horizontal:
+        | "left-to-pointer"
+        | "left-to-element-left" | "left-to-element-right"
+        | "right-to-element-left" | "right-to-element-right"
+        = "left-to-pointer"
+  ) {
     e.preventDefault();
     e.stopPropagation();
-    setCtx({ x: e.clientX + 4, y: e.clientY + 4, items });
+
+    let ctxVertical;
+    let ctxHorizontal;
+
+    switch (vertical) {
+      case "top-to-pointer":
+        ctxVertical = { top: e.clientY + 4 };
+        break;
+      case "top-to-element-top":
+        ctxVertical = { top: e.currentTarget.getBoundingClientRect().top };
+        break;
+      case "top-to-element-bottom":
+        ctxVertical = { top: e.currentTarget.getBoundingClientRect().bottom };
+        break;
+    }
+
+    switch (horizontal) {
+      case "left-to-pointer":
+        ctxHorizontal = { left: e.clientX - 4 };
+        break;
+      case "left-to-element-left":
+        ctxHorizontal = { left: e.currentTarget.getBoundingClientRect().left };
+        break;
+      case "left-to-element-right":
+        ctxHorizontal = { left: e.currentTarget.getBoundingClientRect().right };
+        break;
+      case "right-to-element-left":
+        ctxHorizontal = { right: e.currentTarget.getBoundingClientRect().left };
+        break;
+      case "right-to-element-right":
+        ctxHorizontal = { right: e.currentTarget.getBoundingClientRect().right };
+        break;
+    }
+
+    setCtx({ vertical: ctxVertical, horizontal: ctxHorizontal, items, onClose: () => setCtx(null) });
   }
 
   function fileCtxItems(path: string): ContextMenuItem[] {
     return [
-      { label: "Rename", onClick: () => startEdit(path) },
-      { label: "Export", onClick: () => triggerDownload(`/api/export/file/${pathToUrl(path)}`) },
-      { label: "Delete", danger: true, onClick: () => doDelete(path) },
+      { type: "item", label: "Rename", icon: Pencil, onClick: () => startEdit(path) },
+      { type: "separator" },
+      { type: "item", label: "Export", icon: Download, onClick: () => triggerDownload(`/api/export/file/${pathToUrl(path)}`) },
+      { type: "item", label: "Delete", danger: true, icon: Trash2, onClick: () => doDelete(path) },
     ];
   }
 
   function dirCtxItems(path: string): ContextMenuItem[] {
     return [
-      { label: "New File", onClick: () => doNewFile(path) },
-      { label: "New Folder", onClick: () => doNewDir(path) },
-      { label: "Rename", onClick: () => startEdit(path) },
-      { label: "Export as zip", onClick: () => triggerDownload(`/api/export/dir/${pathToUrl(path)}`) },
-      { label: "Delete", danger: true, onClick: () => doDelete(path) },
+      { type: "item", label: "New file", icon: FilePlus, onClick: () => doNewFile(path) },
+      { type: "item", label: "New folder", icon: FolderPlus, onClick: () => doNewDir(path) },
+      { type: "separator" },
+      { type: "item", label: "Rename", icon: Pencil, onClick: () => startEdit(path) },
+      { type: "separator" },
+      { type: "item", label: "Export as zip", icon: Download, onClick: () => triggerDownload(`/api/export/dir/${pathToUrl(path)}`) },
+      { type: "item", label: "Delete", danger: true, icon: Trash2, onClick: () => doDelete(path) },
     ];
   }
 
   function backgroundCtxItems(): ContextMenuItem[] {
     return [
-      { label: "New File", onClick: () => doNewFile("/") },
-      { label: "New Folder", onClick: () => doNewDir("/") },
+      { type: "item", label: "New file", icon: FilePlus, onClick: () => doNewFile("/") },
+      { type: "item", label: "New folder", icon: FolderPlus, onClick: () => doNewDir("/") },
+    ];
+  }
+
+  function workspaceCtxItems(): ContextMenuItem[] {
+    return [
+      { type: "item", label: "New file", icon: FilePlus, onClick: () => doNewFile("/") },
+      { type: "item", label: "New folder", icon: FolderPlus, onClick: () => doNewDir("/") },
+      { type: "separator" },
+      { type: "item", label: "Export workspace", icon: Download, onClick: () => triggerDownload(`/api/export/dir/`) },
     ];
   }
 
@@ -404,28 +453,16 @@ const FileTree = forwardRef<FileTreeHandle, Props>(function FileTree(
         <div className="sidebar-menu">
           <button
             className="sidebar-menu-btn"
-            onClick={() => setWsMenuOpen((o) => !o)}
+            onClick={(e) => openCtx(
+              e, workspaceCtxItems(),
+              "top-to-element-bottom", "left-to-element-left")}
+            onContextMenu={(e) => openCtx(
+              e, workspaceCtxItems(),
+              "top-to-element-bottom", "left-to-element-left")}
             aria-label="Workspace menu"
           >
             <Menu size={14} />
           </button>
-          {wsMenuOpen && (
-            <>
-              <div className="sidebar-menu-backdrop" onMouseDown={() => setWsMenuOpen(false)} />
-              <div className="sidebar-menu-dropdown">
-                <button className="sidebar-menu-item" onClick={() => { doNewFile("/"); setWsMenuOpen(false); }}>
-                  <FilePlus size={13} /> New file
-                </button>
-                <button className="sidebar-menu-item" onClick={() => { doNewDir("/"); setWsMenuOpen(false); }}>
-                  <FolderPlus size={13} /> New folder
-                </button>
-                <hr className="sidebar-menu-divider" />
-                <button className="sidebar-menu-item" onClick={() => { triggerDownload("/api/export/dir"); setWsMenuOpen(false); }}>
-                  <Download size={13} /> Export workspace
-                </button>
-              </div>
-            </>
-          )}
         </div>
       </div>
       <div
@@ -449,12 +486,7 @@ const FileTree = forwardRef<FileTreeHandle, Props>(function FileTree(
         )}
       </div>
       {ctx && (
-        <ContextMenu
-          x={ctx.x}
-          y={ctx.y}
-          items={ctx.items}
-          onClose={() => setCtx(null)}
-        />
+        <ContextMenu {...ctx}/>
       )}
       {confirmPath && (
         <ConfirmModal
