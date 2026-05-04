@@ -1,0 +1,16 @@
+.statusBar {
+  height: 24px;
+  border-top: 1px solid var(--border);
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+
+.statusError {
+  color: var(--danger);
+}

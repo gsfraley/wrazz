@@ -1,0 +1,89 @@
+.editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.editorUnsavedBar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 12px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.editorUnsavedBar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    color-mix(in srgb, var(--paper-sidebar), var(--paper-topbar) 35%) 6px,
+    color-mix(in srgb, var(--paper-sidebar), var(--paper-topbar) 35%) 12px
+  );
+  mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.editorUnsavedBar.isDirty::before {
+  opacity: 1;
+}
+
+.editorUnsavedMsg {
+  position: relative;
+  z-index: 1;
+  font-size: 9px;
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--border);
+  padding: 0 36px;
+  background: radial-gradient(ellipse at center, var(--paper) 58%, transparent 66%);
+}
+
+.editorEmpty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
+.editorBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.editorTitleRow {
+  display: flex;
+  align-items: baseline;
+  padding: 20px 16px 8px calc(var(--we-margin) - 12px);
+  flex-shrink: 0;
+}
+
+.editorTitle {
+  flex: 1;
+  font-size: 40px;
+  font-family: 'Libre Baskerville', Georgia, serif;
+  color: var(--ink);
+  border: none;
+  background: transparent;
+  outline: none;
+  min-width: 0;
+}
+
+.editorTitle::placeholder {
+  color: var(--ink-muted);
+}

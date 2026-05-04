@@ -4,12 +4,13 @@ import { listEntries } from "../api/files";
 import { useActiveContext } from "../lib/context";
 import { getActions } from "../lib/actions";
 import { useContextMenu } from "../lib/contextMenu";
+import { pathToDisplayTitle, cx } from "../lib/utils";
 import type { ContextMenuItem } from "./ContextMenu";
 import type { Action } from "../lib/actions";
 import { Search } from "../icons";
-import { pathToDisplayTitle } from "../App";
 import ProfileModal from "./modals/ProfileModal";
 import AdminModal from "./modals/AdminModal";
+import styles from "./CommandBar.module.css";
 
 // ── Fuzzy match ────────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ interface DropdownPos {
   width: number;
 }
 
-interface Props {
+export interface CommandBarProps {
   user: CurrentUser;
   onLogout: () => void;
   onUserUpdated: (user: CurrentUser) => void;
@@ -82,7 +83,7 @@ export default function CommandBar({
   hasActiveFile,
   isDirty,
   editorTitle,
-}: Props) {
+}: CommandBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const inputWrapRef = useRef<HTMLDivElement>(null);
   const commandBarRef = useRef<HTMLDivElement>(null);
@@ -136,9 +137,6 @@ export default function CommandBar({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
-  // Compute result sections; `open` in deps ensures getActions() is read fresh on each open.
-  // "Relevant now" always shows editor-context actions (when a file is open), regardless of
-  // which pane currently has focus.
   const sections = useMemo((): Section[] => {
     if (!open) return [];
     const actions = getActions();
@@ -162,7 +160,6 @@ export default function CommandBar({
       fuzzyMatch(a.label, query) || a.keywords?.some((k) => fuzzyMatch(k, query));
 
     const matched = actions.filter(matchAction);
-    // In search results, still use active pane context for relevance ranking
     const ctxActions = matched.filter((a) => ctx && a.contexts?.includes(ctx));
     const otherActions = matched.filter((a) => !ctx || !a.contexts?.includes(ctx));
 
@@ -209,8 +206,19 @@ export default function CommandBar({
     }
   }
 
-  // Always show editor-context action chips when a file is open;
-  // Discard only appears when there are unsaved changes.
+  function userMenuItems(): ContextMenuItem[] {
+    return [
+      { type: "item", label: "Profile", onClick: () => openModal("profile") },
+      ...(user.is_admin ? [{ type: "item" as const, label: "Administration", onClick: () => openModal("admin") }] : []),
+      { type: "separator" },
+      { type: "item", label: "Sign out", onClick: onLogout },
+    ];
+  }
+
+  function openUserMenu(e: React.MouseEvent) {
+    openCtx(e, userMenuItems(), "top-to-element-bottom", "right-to-element-right");
+  }
+
   const contextChips = !hasActiveFile ? [] :
     getActions()
       .filter((a) => a.contexts?.includes("editor") && (a.id !== "core:discard" || isDirty))
@@ -218,13 +226,12 @@ export default function CommandBar({
 
   return (
     <>
-      <div className={`command-bar${open ? " is-open" : ""}`} ref={commandBarRef}>
-        {/* Input wrap — acts as the visual bar; chips live inside on the right */}
-        <div className={`command-input-wrap${open ? " is-open" : ""}`} ref={inputWrapRef}>
-          <Search size={14} className="command-input-search-icon" />
+      <div className={cx(styles.commandBar, open && styles.isOpen)} ref={commandBarRef}>
+        <div className={cx(styles.commandInputWrap, open && styles.isOpen)} ref={inputWrapRef}>
+          <Search size={14} className={styles.commandInputSearchIcon} />
           <input
             ref={inputRef}
-            className={`command-input${open ? " is-open" : ""}`}
+            className={cx(styles.commandInput, open && styles.isOpen)}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => { if (!open) openPalette(); }}
@@ -234,11 +241,11 @@ export default function CommandBar({
             spellCheck={false}
           />
           {!open && contextChips.length > 0 && (
-            <div className="command-chips">
+            <div className={styles.commandChips}>
               {contextChips.map((a) => (
                 <button
                   key={a.id}
-                  className="command-chip"
+                  className={styles.commandChip}
                   onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); a.handler(); }}
                   title={a.label}
                 >
@@ -251,18 +258,11 @@ export default function CommandBar({
         </div>
 
         {/* User menu on the right */}
-        <div className="user-menu">
+        <div className={styles.userMenu}>
           <button
-            className="user-menu-trigger"
-            onClick={(e) => {
-              const items: ContextMenuItem[] = [
-                { type: "item", label: "Profile", onClick: () => openModal("profile") },
-                ...(user.is_admin ? [{ type: "item" as const, label: "Administration", onClick: () => openModal("admin") }] : []),
-                { type: "separator" },
-                { type: "item", label: "Sign out", onClick: onLogout },
-              ];
-              openCtx(e, items, "top-to-element-bottom", "right-to-element-right");
-            }}
+            className={styles.userMenuTrigger}
+            onClick={(e) => openUserMenu(e)}
+            onContextMenu={(e) => openUserMenu(e)}
           >
             {user.display_name}
           </button>
@@ -270,22 +270,22 @@ export default function CommandBar({
       </div>
 
       {/* Transparent backdrop — captures clicks outside to close */}
-      {open && <div className="command-backdrop" onMouseDown={closePalette} />}
+      {open && <div className={styles.commandBackdrop} onMouseDown={closePalette} />}
 
       {/* Dropdown positioned below the input bar */}
       {open && dropdownPos && (
         <div
-          className="command-dropdown"
+          className={styles.commandDropdown}
           style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           {flatItems.length === 0 ? (
-            <div className="palette-empty">No results</div>
+            <div className={styles.paletteEmpty}>No results</div>
           ) : (
             sections.map((section, si) => (
               <div key={si}>
-                {si > 0 && <div className="palette-separator" />}
-                {section.label && <div className="palette-section-label">{section.label}</div>}
+                {si > 0 && <div className={styles.paletteSeparator} />}
+                {section.label && <div className={styles.paletteSectionLabel}>{section.label}</div>}
                 {section.items.map((item) => {
                   const idx = itemIndex.get(item) ?? 0;
                   const isSel = idx === selected;
@@ -293,26 +293,26 @@ export default function CommandBar({
                     return (
                       <button
                         key={item.action.id}
-                        className={`palette-result${isSel ? " is-selected" : ""}`}
+                        className={cx(styles.paletteResult, isSel && styles.isSelected)}
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => { item.action.handler(); closePalette(); }}
                         onMouseEnter={() => setSelected(idx)}
                       >
                         {item.action.icon && <item.action.icon size={14} />}
-                        <span className="palette-result-label">{item.action.label}</span>
+                        <span className={styles.paletteResultLabel}>{item.action.label}</span>
                       </button>
                     );
                   }
                   return (
                     <button
                       key={item.path}
-                      className={`palette-result${isSel ? " is-selected" : ""}`}
+                      className={cx(styles.paletteResult, isSel && styles.isSelected)}
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => { onOpenFile(item.path); closePalette(); }}
                       onMouseEnter={() => setSelected(idx)}
                     >
-                      <span className="palette-result-label">{item.displayLabel}</span>
-                      <span className="palette-result-path">{item.path}</span>
+                      <span className={styles.paletteResultLabel}>{item.displayLabel}</span>
+                      <span className={styles.paletteResultPath}>{item.path}</span>
                     </button>
                   );
                 })}

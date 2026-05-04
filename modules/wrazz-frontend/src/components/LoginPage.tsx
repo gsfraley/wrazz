@@ -2,12 +2,13 @@ import { useState, useEffect, FormEvent } from "react";
 import { login } from "../api/auth";
 import { getOidcStatus } from "../api/admin";
 import type { CurrentUser } from "../api/auth";
+import styles from "./LoginPage.module.css";
 
-interface Props {
+export interface LoginPageProps {
   onLogin: (user: CurrentUser) => void;
 }
 
-export default function LoginPage({ onLogin }: Props) {
+export default function LoginPage({ onLogin }: LoginPageProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -38,16 +39,16 @@ export default function LoginPage({ onLogin }: Props) {
   }
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <h1 className="login-title">wrazz</h1>
-        <form className="login-form" onSubmit={handleSubmit}>
-          <label className="login-label" htmlFor="login-username">
+    <div className={styles.loginPage}>
+      <div className={styles.loginCard}>
+        <h1 className={styles.loginTitle}>wrazz</h1>
+        <form className={styles.loginForm} onSubmit={handleSubmit}>
+          <label className={styles.loginLabel} htmlFor="login-username">
             Username
           </label>
           <input
             id="login-username"
-            className="login-input"
+            className={styles.loginInput}
             type="text"
             autoComplete="username"
             value={username}
@@ -55,12 +56,12 @@ export default function LoginPage({ onLogin }: Props) {
             disabled={busy}
             required
           />
-          <label className="login-label" htmlFor="login-password">
+          <label className={styles.loginLabel} htmlFor="login-password">
             Password
           </label>
           <input
             id="login-password"
-            className="login-input"
+            className={styles.loginInput}
             type="password"
             autoComplete="current-password"
             value={password}
@@ -68,18 +69,18 @@ export default function LoginPage({ onLogin }: Props) {
             disabled={busy}
             required
           />
-          {error && <p className="login-error">{error}</p>}
-          <button className="login-submit" type="submit" disabled={busy}>
+          {error && <p className={styles.loginError}>{error}</p>}
+          <button className={styles.loginSubmit} type="submit" disabled={busy}>
             {busy ? "signing in…" : "sign in"}
           </button>
         </form>
 
         {oidcEnabled && (
           <>
-            <div className="login-divider">
-              <span className="login-divider-label">or</span>
+            <div className={styles.loginDivider}>
+              <span className={styles.loginDividerLabel}>or</span>
             </div>
-            <a className="login-sso" href="/api/auth/oidc/redirect">
+            <a className={styles.loginSso} href="/api/auth/oidc/redirect">
               sign in with SSO
             </a>
           </>

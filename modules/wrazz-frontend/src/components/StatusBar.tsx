@@ -1,14 +1,15 @@
 import { AppStatus } from "../types";
+import styles from "./StatusBar.module.css";
 
-interface Props {
+export interface StatusBarProps {
   title: string | null;
   status: AppStatus | null;
 }
 
-export default function StatusBar({ title, status }: Props) {
+export default function StatusBar({ title, status }: StatusBarProps) {
   return (
-    <footer className="status-bar">
-      <span className={status?.kind === "error" ? "status-error" : ""}>
+    <footer className={styles.statusBar}>
+      <span className={status?.kind === "error" ? styles.statusError : ""}>
         {status?.message ?? ""}
       </span>
       <span>{title ?? ""}</span>

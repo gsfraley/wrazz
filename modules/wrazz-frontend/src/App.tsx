@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { FileEntry, getFile, getFileContent, updateFile } from "./api/files";
 import { CurrentUser, getCurrentUser, logout } from "./api/auth";
-import { AppStatus } from "./types";
+import { AppStatus, Draft } from "./types";
 import FileTree from "./components/FileTree";
 import type { FileTreeHandle } from "./components/FileTree";
-import Editor, { Draft } from "./components/Editor";
+import Editor from "./components/Editor";
 import CommandBar from "./components/CommandBar";
 import StatusBar from "./components/StatusBar";
 import LoginPage from "./components/LoginPage";
@@ -14,17 +14,11 @@ import type { ActionContext } from "./lib/actions";
 import { registerAction } from "./lib/actions";
 import { ContextMenuCtx } from "./lib/contextMenu";
 import type { VerticalAnchor, HorizontalAnchor } from "./lib/contextMenu";
-import { assertNever } from "./lib/utils";
+import { assertNever, pathToDisplayTitle } from "./lib/utils";
 import ContextMenu from "./components/ContextMenu";
 import type { ContextMenuProps, ContextMenuItem } from "./components/ContextMenu";
 import { Save, RotateCcw, FilePlus, FolderPlus, Download } from "./icons";
-
-// ── Title helpers ──────────────────────────────────────────────────────────
-
-export function pathToDisplayTitle(path: string): string {
-  const filename = path.split("/").filter(Boolean).pop() ?? path;
-  return filename.replace(/\.md$/i, "").replace(/[-_]/g, " ");
-}
+import styles from "./App.module.css";
 
 // ── App ────────────────────────────────────────────────────────────────────
 
@@ -74,11 +68,11 @@ export default function App() {
       vertical === "top-to-element-bottom" ? { top: rect.bottom }   :
       assertNever(vertical);
     const ctxHorizontal =
-      horizontal === "left-to-pointer"        ? { left: e.clientX - 4 } :
-      horizontal === "left-to-element-left"   ? { left: rect.left }     :
-      horizontal === "left-to-element-right"  ? { left: rect.right }    :
-      horizontal === "right-to-element-left"  ? { right: rect.left }    :
-      horizontal === "right-to-element-right" ? { right: rect.right }   :
+      horizontal === "left-to-pointer"        ? { left: e.clientX - 4 }                    :
+      horizontal === "left-to-element-left"   ? { left: rect.left }                        :
+      horizontal === "left-to-element-right"  ? { left: rect.right }                       :
+      horizontal === "right-to-element-left"  ? { right: window.innerWidth - rect.left }   :
+      horizontal === "right-to-element-right" ? { right: window.innerWidth - rect.right }  :
       assertNever(horizontal);
     setCtxMenu({ vertical: ctxVertical, horizontal: ctxHorizontal, items, onClose: () => setCtxMenu(null) });
   }
@@ -271,11 +265,13 @@ export default function App() {
     return <LoginPage onLogin={setUser} />;
   }
 
+  const editorTitle = draft?.title || (activePath ? pathToDisplayTitle(activePath) : null);
+
   return (
     <ContextMenuCtx.Provider value={openCtx}>
     <ActiveContextCtx.Provider value={{ ctx: activeCtx, setCtx: setActiveCtx }}>
-      <div className="app">
-        <div className="workspace">
+      <div className={styles.app}>
+        <div className={styles.workspace}>
           <FileTree
             ref={fileTreeRef}
             activePath={activePath}
@@ -285,8 +281,8 @@ export default function App() {
             width={sidebarWidth}
             draftPaths={draftPaths}
           />
-          <div className="sidebar-resizer" onMouseDown={onResizerMouseDown} />
-          <div className="editor-column">
+          <div className={styles.sidebarResizer} onMouseDown={onResizerMouseDown} />
+          <div className={styles.editorColumn}>
             <CommandBar
               user={user}
               onLogout={handleLogout}
@@ -295,7 +291,7 @@ export default function App() {
               reloadKey={reloadKey}
               hasActiveFile={activeFile !== null}
               isDirty={isDirty}
-              editorTitle={draft?.title || (activePath ? pathToDisplayTitle(activePath) : null)}
+              editorTitle={editorTitle}
             />
             <Editor
               file={activeFile}
@@ -307,7 +303,7 @@ export default function App() {
             />
           </div>
         </div>
-        <StatusBar title={draft?.title || (activePath ? pathToDisplayTitle(activePath) : null)} status={status} />
+        <StatusBar title={editorTitle} status={status} />
         {ctxMenu && <ContextMenu {...ctxMenu} />}
       </div>
     </ActiveContextCtx.Provider>

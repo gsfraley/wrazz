@@ -3,8 +3,10 @@ import { Entry, createFile, createDir, moveEntry, deleteEntry, listEntries } fro
 import { ChevronRight, ChevronDown, Download, FilePlus, FolderPlus, Pencil, Trash2, Menu } from "../icons";
 import { useActiveContext } from "../lib/context";
 import { useContextMenu } from "../lib/contextMenu";
+import { cx } from "../lib/utils";
 import type { ContextMenuItem } from "./ContextMenu";
 import ConfirmModal from "./modals/ConfirmModal";
+import styles from "./FileTree.module.css";
 
 function pathToUrl(path: string): string {
   return path.replace(/^\/|\/$/g, "");
@@ -23,7 +25,7 @@ export interface FileTreeHandle {
   newDir: (parentPath?: string) => void;
 }
 
-interface FileTreeProps {
+export interface FileTreeProps {
   activePath: string | null;
   onOpen: (path: string) => void;
   onDeleted: (path: string) => void;
@@ -306,7 +308,7 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
         return (
           <div key={entry.path}>
             <div
-              className={`tree-row tree-row--dir${isDragOver ? " drag-over" : ""}`}
+              className={cx(styles.treeRow, isDragOver && styles.dragOver)}
               style={{ paddingLeft: dirIndent }}
               onClick={() => !isEditing && toggleDir(entry.path)}
               onDoubleClick={() => startEdit(entry.path)}
@@ -318,13 +320,13 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
               onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDrop(entry.path); }}
               onDragEnd={() => { setDragPath(null); setDragOverPath(null); }}
             >
-              <span className="tree-chevron">
+              <span className={styles.treeChevron}>
                 {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
               </span>
               {isEditing ? (
                 <input
                   ref={editInputRef}
-                  className="tree-edit-input"
+                  className={styles.treeEditInput}
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
                   onBlur={commitEdit}
@@ -335,17 +337,17 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <span className="tree-name">{entryName(entry.path)}</span>
+                <span className={styles.treeName}>{entryName(entry.path)}</span>
               )}
               {!isEditing && (
-                <span className="tree-actions">
-                  <button className="btn-icon" onClick={(e) => { e.stopPropagation(); doNewFile(entry.path); }} aria-label="New file in folder">
+                <span className={styles.treeActions}>
+                  <button className={styles.btnIcon} onClick={(e) => { e.stopPropagation(); doNewFile(entry.path); }} aria-label="New file in folder">
                     <FilePlus size={13} />
                   </button>
-                  <button className="btn-icon" onClick={(e) => { e.stopPropagation(); doNewDir(entry.path); }} aria-label="New folder in folder">
+                  <button className={styles.btnIcon} onClick={(e) => { e.stopPropagation(); doNewDir(entry.path); }} aria-label="New folder in folder">
                     <FolderPlus size={13} />
                   </button>
-                  <button className="btn-icon btn-icon--danger" onClick={(e) => { e.stopPropagation(); doDeleteConfirm(entry.path); }} aria-label="Delete folder">
+                  <button className={cx(styles.btnIcon, styles.btnIconDanger)} onClick={(e) => { e.stopPropagation(); doDeleteConfirm(entry.path); }} aria-label="Delete folder">
                     <Trash2 size={13} />
                   </button>
                 </span>
@@ -359,7 +361,7 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
       return (
         <div
           key={entry.path}
-          className={`tree-row tree-row--file${entry.path === activePath ? " active" : ""}`}
+          className={cx(styles.treeRow, entry.path === activePath && styles.active)}
           style={{ paddingLeft: fileIndent }}
           onClick={() => !isEditing && onOpen(entry.path)}
           onDoubleClick={() => startEdit(entry.path)}
@@ -371,7 +373,7 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
           {isEditing ? (
             <input
               ref={editInputRef}
-              className="tree-edit-input"
+              className={styles.treeEditInput}
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={commitEdit}
@@ -383,10 +385,10 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
             />
           ) : (
             <>
-              <span className="tree-name">{entryName(entry.path)}</span>
-              {draftPaths.has(entry.path) && <span className="tree-draft-dot" />}
-              <span className="tree-actions">
-                <button className="btn-icon btn-icon--danger" onClick={(e) => { e.stopPropagation(); doDeleteConfirm(entry.path); }} aria-label="Delete file">
+              <span className={styles.treeName}>{entryName(entry.path)}</span>
+              {draftPaths.has(entry.path) && <span className={styles.treeDraftDot} />}
+              <span className={styles.treeActions}>
+                <button className={cx(styles.btnIcon, styles.btnIconDanger)} onClick={(e) => { e.stopPropagation(); doDeleteConfirm(entry.path); }} aria-label="Delete file">
                   <Trash2 size={13} />
                 </button>
               </span>
@@ -398,18 +400,14 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
   }
 
   return (
-    <aside className="sidebar" style={{ width }} onClick={() => setActivePane("file-tree")}>
-      <div className="sidebar-header">
-        <span className="sidebar-heading">Workspace</span>
-        <div className="sidebar-menu">
+    <aside className={styles.sidebar} style={{ width }} onClick={() => setActivePane("file-tree")}>
+      <div className={styles.sidebarHeader}>
+        <span className={styles.sidebarHeading}>Workspace</span>
+        <div className={styles.sidebarMenu}>
           <button
-            className="sidebar-menu-btn"
-            onClick={(e) => openCtx(
-              e, workspaceCtxItems(),
-              "top-to-element-bottom", "left-to-element-left")}
-            onContextMenu={(e) => openCtx(
-              e, workspaceCtxItems(),
-              "top-to-element-bottom", "left-to-element-left")}
+            className={styles.sidebarMenuBtn}
+            onClick={(e) => openCtx(e, workspaceCtxItems(), "top-to-element-bottom", "left-to-element-left")}
+            onContextMenu={(e) => openCtx(e, workspaceCtxItems(), "top-to-element-bottom", "left-to-element-left")}
             aria-label="Workspace menu"
           >
             <Menu size={14} />
@@ -417,17 +415,16 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree(
         </div>
       </div>
       <div
-        className="tree"
+        className={styles.tree}
         onContextMenu={(e) => {
-          // Only show background menu when clicking on empty space, not on a row.
-          if ((e.target as HTMLElement).closest(".tree-row")) return;
+          if ((e.target as HTMLElement).closest(`.${styles.treeRow}`)) return;
           openCtx(e, backgroundCtxItems());
         }}
       >
         {renderEntries(root, 0)}
         {dragPath !== null && (
           <div
-            className={`tree-root-drop${dragOverPath === "/" ? " drag-over" : ""}`}
+            className={cx(styles.treeRootDrop, dragOverPath === "/" && styles.dragOver)}
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverPath("/"); }}
             onDragLeave={(e) => { e.stopPropagation(); setDragOverPath(null); }}
             onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDrop("/"); }}

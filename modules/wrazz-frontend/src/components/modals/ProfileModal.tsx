@@ -2,14 +2,16 @@ import { FormEvent, useState } from "react";
 import type { CurrentUser } from "../../api/auth";
 import { updateSelf } from "../../api/user";
 import Modal from "./Modal";
+import styles from "./ProfileModal.module.css";
+import { cx } from "../../lib/utils";
 
-interface Props {
+export interface ProfileModalProps {
   user: CurrentUser;
   onClose: () => void;
   onUpdated: (user: CurrentUser) => void;
 }
 
-export default function ProfileModal({ user, onClose, onUpdated }: Props) {
+export default function ProfileModal({ user, onClose, onUpdated }: ProfileModalProps) {
   const [email, setEmail] = useState(user.email ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,29 +42,29 @@ export default function ProfileModal({ user, onClose, onUpdated }: Props) {
 
   return (
     <Modal title="Profile" onClose={onClose}>
-      <div className="modal-body">
-        <p className="profile-name">{user.display_name}</p>
-        <div className="profile-fields">
-          <div className="profile-field">
-            <span className="profile-label">Account ID</span>
-            <span className="profile-value profile-value--mono">{user.id}</span>
+      <div className={styles.body}>
+        <p className={styles.profileName}>{user.display_name}</p>
+        <div className={styles.profileFields}>
+          <div className={styles.profileField}>
+            <span className={styles.profileLabel}>Account ID</span>
+            <span className={cx(styles.profileValue, styles.profileValueMono)}>{user.id}</span>
           </div>
-          <div className="profile-field">
-            <span className="profile-label">Member Since</span>
-            <span className="profile-value">{memberSince}</span>
+          <div className={styles.profileField}>
+            <span className={styles.profileLabel}>Member Since</span>
+            <span className={styles.profileValue}>{memberSince}</span>
           </div>
-          <div className="profile-field">
-            <span className="profile-label">Role</span>
-            <span className="profile-value">{user.is_admin ? "Admin" : "Member"}</span>
+          <div className={styles.profileField}>
+            <span className={styles.profileLabel}>Role</span>
+            <span className={styles.profileValue}>{user.is_admin ? "Admin" : "Member"}</span>
           </div>
 
-          <form className="profile-email-form" onSubmit={handleSaveEmail}>
-            <div className="profile-field">
-              <label className="profile-label" htmlFor="profile-email">Email</label>
-              <div className="profile-email-row">
+          <form className={styles.profileEmailForm} onSubmit={handleSaveEmail}>
+            <div className={styles.profileField}>
+              <label className={styles.profileLabel} htmlFor="profile-email">Email</label>
+              <div className={styles.profileEmailRow}>
                 <input
                   id="profile-email"
-                  className="profile-email-input"
+                  className={styles.profileEmailInput}
                   type="email"
                   value={email}
                   onChange={(e) => {
@@ -75,14 +77,14 @@ export default function ProfileModal({ user, onClose, onUpdated }: Props) {
                 />
                 <button
                   type="submit"
-                  className="profile-email-save"
+                  className={styles.profileEmailSave}
                   disabled={busy || email.trim() === (user.email ?? "")}
                 >
                   {busy ? "Saving…" : "Save"}
                 </button>
               </div>
-              {error && <p className="profile-email-msg profile-email-msg--error">{error}</p>}
-              {success && <p className="profile-email-msg profile-email-msg--ok">{success}</p>}
+              {error && <p className={cx(styles.profileEmailMsg, styles.profileEmailMsgError)}>{error}</p>}
+              {success && <p className={cx(styles.profileEmailMsg, styles.profileEmailMsgOk)}>{success}</p>}
             </div>
           </form>
         </div>

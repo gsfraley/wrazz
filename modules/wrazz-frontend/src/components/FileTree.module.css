@@ -1,0 +1,179 @@
+.sidebar {
+  flex-shrink: 0;
+  background: var(--paper-sidebar);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebarHeader {
+  height: 60px;
+  padding: 0 8px 0 18px;
+  background: var(--paper-topbar);
+  border-bottom: 1px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.sidebarHeading {
+  font-size: 14px;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.02em;
+  color: var(--ink-muted);
+}
+
+.sidebarMenu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sidebarMenuBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--ink-muted);
+  padding: 0;
+}
+
+.sidebarMenuBtn:hover {
+  color: var(--ink);
+  border-color: var(--ink-muted);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+}
+
+.treeRow {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 26px;
+  cursor: pointer;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  user-select: none;
+  padding-right: 6px;
+}
+
+.treeRow:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.treeRow.active {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.treeRow.dragOver {
+  background: rgba(0, 0, 0, 0.06);
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
+}
+
+.treeChevron {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 14px;
+  color: var(--ink-muted);
+}
+
+.treeName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.treeDraftDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex-shrink: 0;
+}
+
+.treeRow:hover .treeDraftDot {
+  display: none;
+}
+
+.treeActions {
+  display: none;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.treeRow:hover .treeActions {
+  display: flex;
+}
+
+.treeEditInput {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--ink-muted);
+  border-radius: 2px;
+  padding: 1px 4px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+  min-width: 0;
+}
+
+.treeRootDrop {
+  margin: 8px;
+  padding: 40px 8px;
+  border: 1.5px dashed var(--border);
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  text-align: center;
+  cursor: default;
+  user-select: none;
+}
+
+.treeRootDrop.dragOver {
+  border-color: var(--ink-muted);
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.btnIcon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-muted);
+  padding: 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.btnIcon:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.btnIconDanger:hover {
+  color: var(--danger);
+}

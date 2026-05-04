@@ -1,14 +1,16 @@
 import { useEffect } from "react";
+import styles from "./Modal.module.css";
+import { cx } from "../../lib/utils";
 
-interface Props {
+export interface ModalProps {
   title: string;
   onClose: () => void;
   wide?: boolean;
-  className?: string;
+  narrow?: boolean;
   children: React.ReactNode;
 }
 
-export default function Modal({ title, onClose, wide, className, children }: Props) {
+export default function Modal({ title, onClose, wide, narrow, children }: ModalProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -18,14 +20,14 @@ export default function Modal({ title, onClose, wide, className, children }: Pro
   }, [onClose]);
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className={styles.modalBackdrop} onClick={onClose}>
       <div
-        className={`modal${wide ? " modal--wide" : ""}${className ? ` ${className}` : ""}`}
+        className={cx(styles.modal, wide && styles.modalWide, narrow && styles.modalNarrow)}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="modal-header">
-          <span className="modal-title">{title}</span>
-          <button className="modal-close" onClick={onClose} aria-label="Close">
+        <div className={styles.modalHeader}>
+          <span className={styles.modalTitle}>{title}</span>
+          <button className={styles.modalClose} onClick={onClose} aria-label="Close">
             ×
           </button>
         </div>

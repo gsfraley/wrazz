@@ -1,15 +1,14 @@
 import { FileEntry } from "../api/files";
+import { Draft } from "../types";
 import { WrazzEditor } from "wrazz-editor";
 import { useActiveContext } from "../lib/context";
-import { pathToDisplayTitle } from "../App";
+import { pathToDisplayTitle } from "../lib/utils";
+import styles from "./Editor.module.css";
+import { cx } from "../lib/utils";
 
-export interface Draft {
-  title: string;
-  content: string;
-  tags: string[];
-}
+export type { Draft };
 
-interface Props {
+export interface EditorProps {
   file: FileEntry | null;
   draft: Draft | null;
   activePath: string | null;
@@ -25,7 +24,7 @@ export default function Editor({
   isDirty,
   onChange,
   onSave,
-}: Props) {
+}: EditorProps) {
   const { setCtx } = useActiveContext();
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -36,18 +35,17 @@ export default function Editor({
   }
 
   return (
-    <main className="editor" onKeyDown={handleKeyDown} onClick={() => setCtx("editor")}>
-
-      <div className={`editor-unsaved-bar${isDirty && file ? " is-dirty" : ""}`}>
-        {isDirty && file && <span className="editor-unsaved-msg">Unsaved changes</span>}
+    <main className={styles.editor} onKeyDown={handleKeyDown} onClick={() => setCtx("editor")}>
+      <div className={cx(styles.editorUnsavedBar, isDirty && file && styles.isDirty)}>
+        {isDirty && file && <span className={styles.editorUnsavedMsg}>Unsaved changes</span>}
       </div>
       {!file || !draft ? (
-        <div className="editor-empty">Select a file or create a new one.</div>
+        <div className={styles.editorEmpty}>Select a file or create a new one.</div>
       ) : (
-        <div className="editor-body">
-          <div className="editor-title-row">
+        <div className={styles.editorBody}>
+          <div className={styles.editorTitleRow}>
             <input
-              className="editor-title"
+              className={styles.editorTitle}
               value={draft.title}
               onChange={(e) => onChange({ ...draft, title: e.target.value })}
               placeholder={activePath ? pathToDisplayTitle(activePath) : "Title"}

@@ -1,0 +1,64 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.workspace {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.editorColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.sidebarResizer {
+  width: 8px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  position: relative;
+  background:
+    linear-gradient(to bottom, var(--paper-topbar) 60px, transparent 60px),
+    linear-gradient(to right, var(--paper-sidebar) 50%, var(--paper) 50%);
+}
+
+.sidebarResizer::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    to bottom,
+    var(--border-strong) 60px,
+    var(--border) 60px
+  );
+  transition: background 0.1s;
+}
+
+.sidebarResizer:hover::before,
+.sidebarResizer:active::before {
+  background: linear-gradient(
+    to bottom,
+    var(--border-strong) 60px,
+    var(--border-strong) 60px
+  );
+}
+
+.sidebarResizer::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 59px;
+  height: 1px;
+  background: var(--border-strong);
+}

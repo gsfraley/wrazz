@@ -1,6 +1,8 @@
 import Modal from "./Modal";
+import styles from "./ConfirmModal.module.css";
+import { cx } from "../../lib/utils";
 
-interface Props {
+export interface ConfirmModalProps {
   message: string;
   confirmLabel?: string;
   onConfirm: () => void;
@@ -12,15 +14,15 @@ export default function ConfirmModal({
   confirmLabel = "Delete",
   onConfirm,
   onClose,
-}: Props) {
+}: ConfirmModalProps) {
   return (
-    <Modal title="Confirm" onClose={onClose} className="modal--narrow">
-      <div className="confirm-modal-body">
-        <p className="confirm-modal-message">{message}</p>
-        <div className="confirm-modal-actions">
-          <button className="confirm-btn" onClick={onClose}>Cancel</button>
+    <Modal title="Confirm" onClose={onClose} narrow>
+      <div className={styles.confirmModalBody}>
+        <p className={styles.confirmModalMessage}>{message}</p>
+        <div className={styles.confirmModalActions}>
+          <button className={styles.confirmBtn} onClick={onClose}>Cancel</button>
           <button
-            className="confirm-btn confirm-btn--danger"
+            className={cx(styles.confirmBtn, styles.confirmBtnDanger)}
             onClick={() => { onConfirm(); onClose(); }}
           >
             {confirmLabel}

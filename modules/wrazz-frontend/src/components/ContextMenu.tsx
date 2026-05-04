@@ -1,7 +1,9 @@
 import { JSX, useEffect, useRef } from "react";
 import { IconProps } from "../icons";
+import styles from "./ContextMenu.module.css";
+import { cx } from "../lib/utils";
 
-export type ContextMenuItem = 
+export type ContextMenuItem =
   | { type: "item", label: string, danger?: boolean, icon?: (props: IconProps) => JSX.Element, onClick: () => void }
   | { type: "separator" }
 
@@ -30,7 +32,6 @@ export default function ContextMenu({ vertical, horizontal, items, onClose }: Co
     };
   }, [onClose]);
 
-  // Keep the menu inside the viewport.
   const style: React.CSSProperties = {
     position: "fixed",
     top: "top" in vertical ? vertical.top : undefined,
@@ -41,23 +42,24 @@ export default function ContextMenu({ vertical, horizontal, items, onClose }: Co
   };
 
   return (
-    <div ref={ref} className="ctx-menu" style={style}>
+    <div ref={ref} className={styles.ctxMenu} style={style}>
       {items.map((item, i) => {
         switch (item.type) {
           case "item": return (
             <button
               key={i}
-              className={`ctx-menu-item${item.danger ? " ctx-menu-item--danger" : ""}`}
+              className={cx(styles.ctxMenuItem, item.danger && styles.ctxMenuItemDanger)}
               onClick={() => { item.onClick(); onClose(); }}
             >
               {item.label}
-              {item.icon && item.icon({size: 13})}
+              {item.icon && item.icon({ size: 13 })}
             </button>
-            )
+          );
           case "separator": return (
-            <hr className="ctx-menu-divider" />
-            )
-      }})}
+            <hr key={i} className={styles.ctxMenuDivider} />
+          );
+        }
+      })}
     </div>
   );
 }

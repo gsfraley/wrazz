@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Modal from "./Modal";
+import styles from "./AdminModal.module.css";
+import { cx } from "../../lib/utils";
 import {
   AdminUser,
   OidcConfig,
@@ -13,38 +15,38 @@ import {
 
 type AdminPage = "info" | "sso" | "users";
 
-interface Props {
+export interface AdminModalProps {
   onClose: () => void;
   currentUserId: string;
 }
 
-export default function AdminModal({ onClose, currentUserId }: Props) {
+export default function AdminModal({ onClose, currentUserId }: AdminModalProps) {
   const [page, setPage] = useState<AdminPage>("info");
 
   return (
     <Modal title="Administration" onClose={onClose} wide>
-      <div className="admin-modal-inner">
-        <nav className="admin-nav">
+      <div className={styles.adminModalInner}>
+        <nav className={styles.adminNav}>
           <button
-            className={`admin-nav-item${page === "info" ? " active" : ""}`}
+            className={cx(styles.adminNavItem, page === "info" && styles.active)}
             onClick={() => setPage("info")}
           >
             Info
           </button>
           <button
-            className={`admin-nav-item${page === "sso" ? " active" : ""}`}
+            className={cx(styles.adminNavItem, page === "sso" && styles.active)}
             onClick={() => setPage("sso")}
           >
             SSO
           </button>
           <button
-            className={`admin-nav-item${page === "users" ? " active" : ""}`}
+            className={cx(styles.adminNavItem, page === "users" && styles.active)}
             onClick={() => setPage("users")}
           >
             Users
           </button>
         </nav>
-        <div className="admin-section">
+        <div className={styles.adminSection}>
           {page === "info" && <InfoPage />}
           {page === "sso" && <SsoPage />}
           {page === "users" && <UsersPage currentUserId={currentUserId} />}
@@ -56,15 +58,15 @@ export default function AdminModal({ onClose, currentUserId }: Props) {
 
 function InfoPage() {
   return (
-    <div className="admin-info">
-      <p className="admin-info-name">wrazz</p>
-      <p className="admin-info-version">version 0.1.6</p>
-      <p className="admin-info-desc">
+    <div>
+      <p className={styles.adminInfoName}>wrazz</p>
+      <p className={styles.adminInfoVersion}>version 0.1.6</p>
+      <p className={styles.adminInfoDesc}>
         Self-hosted personal journal built around plain Markdown files.
       </p>
-      <div className="admin-info-links">
+      <div className={styles.adminInfoLinks}>
         <a
-          className="admin-info-link"
+          className={styles.adminInfoLink}
           href="https://github.com/gsfraley/wrazz"
           target="_blank"
           rel="noreferrer"
@@ -112,7 +114,6 @@ function SsoPage() {
   async function handleSave(e: FormEvent) {
     e.preventDefault();
 
-    // Redirect URI is always derived from WRAZZ_PUBLIC_URL; block if it's absent.
     if (form.enabled && !config?.suggested_redirect_uri) {
       setError("Set WRAZZ_PUBLIC_URL on the server to compute the redirect URI.");
       return;
@@ -163,26 +164,26 @@ function SsoPage() {
   const isReadOnly = Boolean(config?.env_configured);
 
   return (
-    <form className="sso-form" onSubmit={handleSave}>
-      <div className="sso-status">
-        <span className={`sso-status-dot${config?.active ? " sso-status-dot--active" : ""}`} />
-        <span className="sso-status-label">
+    <form className={styles.ssoForm} onSubmit={handleSave}>
+      <div className={styles.ssoStatus}>
+        <span className={cx(styles.ssoStatusDot, config?.active && styles.ssoStatusDotActive)} />
+        <span className={styles.ssoStatusLabel}>
           {config === null ? "Loading…" : config.active ? "Active" : "Inactive"}
         </span>
       </div>
 
       {isReadOnly && (
-        <p className="sso-env-notice">
+        <p className={styles.ssoEnvNotice}>
           Configured via <code>WRAZZ_OIDC_*</code> environment variables. Unset them to manage SSO here.
         </p>
       )}
 
-      <div className="sso-fields">
-        <div className="sso-field">
-          <label className="sso-label" htmlFor="sso-issuer">Issuer URL</label>
+      <div className={styles.ssoFields}>
+        <div className={styles.ssoField}>
+          <label className={styles.ssoLabel} htmlFor="sso-issuer">Issuer URL</label>
           <input
             id="sso-issuer"
-            className="sso-input"
+            className={styles.ssoInput}
             type="url"
             value={form.issuer_url}
             onChange={(e) => field("issuer_url", e.target.value)}
@@ -192,11 +193,11 @@ function SsoPage() {
           />
         </div>
 
-        <div className="sso-field">
-          <label className="sso-label" htmlFor="sso-client-id">Client ID</label>
+        <div className={styles.ssoField}>
+          <label className={styles.ssoLabel} htmlFor="sso-client-id">Client ID</label>
           <input
             id="sso-client-id"
-            className="sso-input"
+            className={styles.ssoInput}
             type="text"
             value={form.client_id}
             onChange={(e) => field("client_id", e.target.value)}
@@ -205,12 +206,12 @@ function SsoPage() {
           />
         </div>
 
-        <div className="sso-field">
-          <label className="sso-label" htmlFor="sso-secret">Client Secret</label>
-          <div className="sso-secret-row">
+        <div className={styles.ssoField}>
+          <label className={styles.ssoLabel} htmlFor="sso-secret">Client Secret</label>
+          <div className={styles.ssoSecretRow}>
             <input
               id="sso-secret"
-              className="sso-input"
+              className={styles.ssoInput}
               type={showSecret ? "text" : "password"}
               value={form.client_secret}
               onFocus={() => {
@@ -225,7 +226,7 @@ function SsoPage() {
             />
             <button
               type="button"
-              className="sso-secret-toggle"
+              className={styles.ssoSecretToggle}
               onClick={() => setShowSecret((s) => !s)}
               disabled={busy}
             >
@@ -234,18 +235,18 @@ function SsoPage() {
           </div>
         </div>
 
-        <div className="sso-field">
-          <label className="sso-label">Redirect URI</label>
+        <div className={styles.ssoField}>
+          <label className={styles.ssoLabel}>Redirect URI</label>
           {config?.suggested_redirect_uri ? (
-            <p className="sso-redirect-uri">{config.suggested_redirect_uri}</p>
+            <p className={styles.ssoRedirectUri}>{config.suggested_redirect_uri}</p>
           ) : (
-            <p className="sso-redirect-uri sso-redirect-uri--missing">
+            <p className={styles.ssoRedirectUriMissing}>
               Set <code>WRAZZ_PUBLIC_URL</code> on the server to compute this.
             </p>
           )}
         </div>
 
-        <label className="sso-enabled-row">
+        <label className={styles.ssoEnabledRow}>
           <input
             type="checkbox"
             checked={form.enabled}
@@ -256,22 +257,22 @@ function SsoPage() {
             }}
             disabled={busy || isReadOnly}
           />
-          <span className="sso-enabled-label">Enable SSO</span>
+          <span className={styles.ssoEnabledLabel}>Enable SSO</span>
         </label>
       </div>
 
-      {error && <p className="sso-message sso-message--error">{error}</p>}
-      {success && <p className="sso-message sso-message--ok">{success}</p>}
+      {error && <p className={cx(styles.ssoMessage, styles.ssoMessageError)}>{error}</p>}
+      {success && <p className={cx(styles.ssoMessage, styles.ssoMessageOk)}>{success}</p>}
 
       {!isReadOnly && (
-        <div className="sso-actions">
-          <button type="submit" className="sso-btn sso-btn--primary" disabled={busy || config === null}>
+        <div className={styles.ssoActions}>
+          <button type="submit" className={cx(styles.ssoBtn, styles.ssoBtnPrimary)} disabled={busy || config === null}>
             {busy ? "Saving…" : "Save"}
           </button>
           {isConfigured && (
             <button
               type="button"
-              className="sso-btn sso-btn--danger"
+              className={cx(styles.ssoBtn, styles.ssoBtnDanger)}
               onClick={handleDisconnect}
               disabled={busy}
             >
@@ -308,23 +309,23 @@ function UsersPage({ currentUserId }: { currentUserId: string }) {
     }
   }
 
-  if (error) return <p className="admin-users-error">{error}</p>;
-  if (!users) return <p className="admin-users-loading">Loading…</p>;
+  if (error) return <p className={styles.adminUsersError}>{error}</p>;
+  if (!users) return <p className={styles.adminUsersLoading}>Loading…</p>;
 
   return (
-    <div className="admin-users">
+    <div className={styles.adminUsers}>
       {users.map((u) => (
-        <div key={u.id} className="admin-user-row">
-          <div className="admin-user-info">
-            <span className="admin-user-name">{u.display_name}</span>
-            {u.is_admin && <span className="admin-user-badge">Admin</span>}
-            <span className="admin-user-email">
-              {u.email ?? <em className="admin-user-email--unset">no email set</em>}
+        <div key={u.id} className={styles.adminUserRow}>
+          <div className={styles.adminUserInfo}>
+            <span className={styles.adminUserName}>{u.display_name}</span>
+            {u.is_admin && <span className={styles.adminUserBadge}>Admin</span>}
+            <span className={styles.adminUserEmail}>
+              {u.email ?? <em className={styles.adminUserEmailUnset}>no email set</em>}
             </span>
           </div>
           {u.id !== currentUserId && (
             <button
-              className="admin-user-delete"
+              className={styles.adminUserDelete}
               onClick={() => handleDelete(u)}
               disabled={deleting === u.id}
               aria-label={`Delete ${u.display_name}`}

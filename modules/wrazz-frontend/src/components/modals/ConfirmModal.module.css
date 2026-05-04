@@ -1,0 +1,45 @@
+.confirmModalBody {
+  padding: 24px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.confirmModalMessage {
+  font-size: 15px;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.confirmModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirmBtn {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.confirmBtn:hover {
+  color: var(--ink);
+  border-color: var(--ink-muted);
+}
+
+.confirmBtnDanger {
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+.confirmBtnDanger:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}

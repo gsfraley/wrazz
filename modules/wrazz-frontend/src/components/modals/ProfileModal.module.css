@@ -1,0 +1,107 @@
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 36px 30px;
+}
+
+.profileName {
+  font-size: 30px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: normal;
+  color: var(--ink);
+  margin-bottom: 28px;
+}
+
+.profileFields {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.profileField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profileLabel {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.profileValue {
+  font-size: 16px;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--ink);
+}
+
+.profileValueMono {
+  font-family: ui-monospace, monospace;
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.profileEmailForm {
+  margin: 0;
+}
+
+.profileEmailRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.profileEmailInput {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: ui-monospace, monospace;
+  font-size: 14px;
+  outline: none;
+}
+
+.profileEmailInput:focus {
+  border-color: var(--ink-muted);
+}
+
+.profileEmailInput:disabled {
+  opacity: 0.5;
+}
+
+.profileEmailSave {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.profileEmailSave:hover {
+  border-color: var(--ink-muted);
+}
+
+.profileEmailSave:disabled {
+  opacity: 0.5;
+  cursor: default;
+  border-color: var(--border);
+  color: var(--ink-muted);
+}
+
+.profileEmailMsg {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  margin-top: 5px;
+}
+
+.profileEmailMsgError { color: var(--danger); }
+.profileEmailMsgOk    { color: #5a8060; }

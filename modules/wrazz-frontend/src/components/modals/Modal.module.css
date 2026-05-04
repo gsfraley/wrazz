@@ -1,0 +1,68 @@
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: clamp(24px, calc(50vh - 400px), 30vh);
+  padding-bottom: 24px;
+  overflow-y: auto;
+  z-index: 200;
+}
+
+.modal {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  width: 800px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - clamp(24px, calc(50vh - 400px), 30vh) - 24px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modalWide {
+  width: 1200px;
+  min-height: 580px;
+}
+
+.modalNarrow {
+  width: 360px;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modalTitle {
+  font-size: 13px;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-size: 20px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.modalClose:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.05);
+  border-color: transparent;
+}
