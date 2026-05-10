@@ -1,17 +1,18 @@
-import { FormEvent, useEffect, useState } from "react";
-import Modal from "./Modal";
-import styles from "./AdminModal.module.css";
-import { cx } from "../../lib/utils";
+import { type FormEvent, useEffect, useState } from "react";
+import Modal from "@/components/modals/Modal";
+import ConfirmModal from "@/components/modals/ConfirmModal";
+import styles from "@/components/modals/AdminModal.module.css";
+import { cx } from "@/lib/utils";
 import {
-  AdminUser,
-  OidcConfig,
+  type AdminUser,
+  type OidcConfig,
   SECRET_REDACTED,
   deleteOidcConfig,
   deleteUser,
   getOidcConfig,
   listUsers,
   saveOidcConfig,
-} from "../../api/admin";
+} from "@/api/admin";
 
 type AdminPage = "info" | "sso" | "users";
 
@@ -90,6 +91,7 @@ function SsoPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [pendingDisconnect, setPendingDisconnect] = useState(false);
 
   useEffect(() => {
     getOidcConfig()
@@ -143,7 +145,6 @@ function SsoPage() {
   }
 
   async function handleDisconnect() {
-    if (!window.confirm("Remove the stored SSO configuration?")) return;
     setBusy(true);
     setError(null);
     setSuccess(null);
@@ -164,124 +165,134 @@ function SsoPage() {
   const isReadOnly = Boolean(config?.env_configured);
 
   return (
-    <form className={styles.ssoForm} onSubmit={handleSave}>
-      <div className={styles.ssoStatus}>
-        <span className={cx(styles.ssoStatusDot, config?.active && styles.ssoStatusDotActive)} />
-        <span className={styles.ssoStatusLabel}>
-          {config === null ? "Loading…" : config.active ? "Active" : "Inactive"}
-        </span>
-      </div>
-
-      {isReadOnly && (
-        <p className={styles.ssoEnvNotice}>
-          Configured via <code>WRAZZ_OIDC_*</code> environment variables. Unset them to manage SSO here.
-        </p>
-      )}
-
-      <div className={styles.ssoFields}>
-        <div className={styles.ssoField}>
-          <label className={styles.ssoLabel} htmlFor="sso-issuer">Issuer URL</label>
-          <input
-            id="sso-issuer"
-            className={styles.ssoInput}
-            type="url"
-            value={form.issuer_url}
-            onChange={(e) => field("issuer_url", e.target.value)}
-            placeholder="https://auth.example.com/application/o/wrazz/"
-            disabled={busy || isReadOnly}
-            required={form.enabled}
-          />
+    <>
+      <form className={styles.ssoForm} onSubmit={handleSave}>
+        <div className={styles.ssoStatus}>
+          <span className={cx(styles.ssoStatusDot, config?.active && styles.ssoStatusDotActive)} />
+          <span className={styles.ssoStatusLabel}>
+            {config === null ? "Loading…" : config.active ? "Active" : "Inactive"}
+          </span>
         </div>
 
-        <div className={styles.ssoField}>
-          <label className={styles.ssoLabel} htmlFor="sso-client-id">Client ID</label>
-          <input
-            id="sso-client-id"
-            className={styles.ssoInput}
-            type="text"
-            value={form.client_id}
-            onChange={(e) => field("client_id", e.target.value)}
-            disabled={busy || isReadOnly}
-            required={form.enabled}
-          />
-        </div>
+        {isReadOnly && (
+          <p className={styles.ssoEnvNotice}>
+            Configured via <code>WRAZZ_OIDC_*</code> environment variables. Unset them to manage SSO here.
+          </p>
+        )}
 
-        <div className={styles.ssoField}>
-          <label className={styles.ssoLabel} htmlFor="sso-secret">Client Secret</label>
-          <div className={styles.ssoSecretRow}>
+        <div className={styles.ssoFields}>
+          <div className={styles.ssoField}>
+            <label className={styles.ssoLabel} htmlFor="sso-issuer">Issuer URL</label>
             <input
-              id="sso-secret"
+              id="sso-issuer"
               className={styles.ssoInput}
-              type={showSecret ? "text" : "password"}
-              value={form.client_secret}
-              onFocus={() => {
-                if (!isReadOnly && form.client_secret === SECRET_REDACTED) {
-                  field("client_secret", "");
-                }
-              }}
-              onChange={(e) => field("client_secret", e.target.value)}
-              placeholder={isConfigured ? "Leave blank to keep existing" : ""}
+              type="url"
+              value={form.issuer_url}
+              onChange={(e) => field("issuer_url", e.target.value)}
+              placeholder="https://auth.example.com/application/o/wrazz/"
               disabled={busy || isReadOnly}
-              required={form.enabled && !isConfigured}
+              required={form.enabled}
             />
-            <button
-              type="button"
-              className={styles.ssoSecretToggle}
-              onClick={() => setShowSecret((s) => !s)}
-              disabled={busy}
-            >
-              {showSecret ? "Hide" : "Show"}
-            </button>
           </div>
+
+          <div className={styles.ssoField}>
+            <label className={styles.ssoLabel} htmlFor="sso-client-id">Client ID</label>
+            <input
+              id="sso-client-id"
+              className={styles.ssoInput}
+              type="text"
+              value={form.client_id}
+              onChange={(e) => field("client_id", e.target.value)}
+              disabled={busy || isReadOnly}
+              required={form.enabled}
+            />
+          </div>
+
+          <div className={styles.ssoField}>
+            <label className={styles.ssoLabel} htmlFor="sso-secret">Client Secret</label>
+            <div className={styles.ssoSecretRow}>
+              <input
+                id="sso-secret"
+                className={styles.ssoInput}
+                type={showSecret ? "text" : "password"}
+                value={form.client_secret}
+                onFocus={() => {
+                  if (!isReadOnly && form.client_secret === SECRET_REDACTED) {
+                    field("client_secret", "");
+                  }
+                }}
+                onChange={(e) => field("client_secret", e.target.value)}
+                placeholder={isConfigured ? "Leave blank to keep existing" : ""}
+                disabled={busy || isReadOnly}
+                required={form.enabled && !isConfigured}
+              />
+              <button
+                type="button"
+                className={styles.ssoSecretToggle}
+                onClick={() => setShowSecret((s) => !s)}
+                disabled={busy}
+              >
+                {showSecret ? "Hide" : "Show"}
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.ssoField}>
+            <label className={styles.ssoLabel}>Redirect URI</label>
+            {config?.suggested_redirect_uri ? (
+              <p className={styles.ssoRedirectUri}>{config.suggested_redirect_uri}</p>
+            ) : (
+              <p className={styles.ssoRedirectUriMissing}>
+                Set <code>WRAZZ_PUBLIC_URL</code> on the server to compute this.
+              </p>
+            )}
+          </div>
+
+          <label className={styles.ssoEnabledRow}>
+            <input
+              type="checkbox"
+              checked={form.enabled}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, enabled: e.target.checked }));
+                setError(null);
+                setSuccess(null);
+              }}
+              disabled={busy || isReadOnly}
+            />
+            <span className={styles.ssoEnabledLabel}>Enable SSO</span>
+          </label>
         </div>
 
-        <div className={styles.ssoField}>
-          <label className={styles.ssoLabel}>Redirect URI</label>
-          {config?.suggested_redirect_uri ? (
-            <p className={styles.ssoRedirectUri}>{config.suggested_redirect_uri}</p>
-          ) : (
-            <p className={styles.ssoRedirectUriMissing}>
-              Set <code>WRAZZ_PUBLIC_URL</code> on the server to compute this.
-            </p>
-          )}
-        </div>
+        {error && <p className={cx(styles.ssoMessage, styles.ssoMessageError)}>{error}</p>}
+        {success && <p className={cx(styles.ssoMessage, styles.ssoMessageOk)}>{success}</p>}
 
-        <label className={styles.ssoEnabledRow}>
-          <input
-            type="checkbox"
-            checked={form.enabled}
-            onChange={(e) => {
-              setForm((f) => ({ ...f, enabled: e.target.checked }));
-              setError(null);
-              setSuccess(null);
-            }}
-            disabled={busy || isReadOnly}
-          />
-          <span className={styles.ssoEnabledLabel}>Enable SSO</span>
-        </label>
-      </div>
-
-      {error && <p className={cx(styles.ssoMessage, styles.ssoMessageError)}>{error}</p>}
-      {success && <p className={cx(styles.ssoMessage, styles.ssoMessageOk)}>{success}</p>}
-
-      {!isReadOnly && (
-        <div className={styles.ssoActions}>
-          <button type="submit" className={cx(styles.ssoBtn, styles.ssoBtnPrimary)} disabled={busy || config === null}>
-            {busy ? "Saving…" : "Save"}
-          </button>
-          {isConfigured && (
-            <button
-              type="button"
-              className={cx(styles.ssoBtn, styles.ssoBtnDanger)}
-              onClick={handleDisconnect}
-              disabled={busy}
-            >
-              Disconnect
+        {!isReadOnly && (
+          <div className={styles.ssoActions}>
+            <button type="submit" className={cx(styles.ssoBtn, styles.ssoBtnPrimary)} disabled={busy || config === null}>
+              {busy ? "Saving…" : "Save"}
             </button>
-          )}
-        </div>
+            {isConfigured && (
+              <button
+                type="button"
+                className={cx(styles.ssoBtn, styles.ssoBtnDanger)}
+                onClick={() => setPendingDisconnect(true)}
+                disabled={busy}
+              >
+                Disconnect
+              </button>
+            )}
+          </div>
+        )}
+      </form>
+
+      {pendingDisconnect && (
+        <ConfirmModal
+          message="Remove the stored SSO configuration?"
+          onConfirm={() => { void handleDisconnect(); }}
+          onClose={() => setPendingDisconnect(false)}
+        />
       )}
-    </form>
+    </>
   );
 }
 
@@ -289,6 +300,7 @@ function UsersPage({ currentUserId }: { currentUserId: string }) {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     listUsers()
@@ -296,12 +308,11 @@ function UsersPage({ currentUserId }: { currentUserId: string }) {
       .catch(() => setError("Could not load users."));
   }, []);
 
-  async function handleDelete(user: AdminUser) {
-    if (!window.confirm(`Delete account "${user.display_name}"? This cannot be undone.`)) return;
-    setDeleting(user.id);
+  async function handleDelete(userId: string) {
+    setDeleting(userId);
     try {
-      await deleteUser(user.id);
-      setUsers((u) => u?.filter((x) => x.id !== user.id) ?? null);
+      await deleteUser(userId);
+      setUsers((u) => u?.filter((x) => x.id !== userId) ?? null);
     } catch {
       setError("Could not delete user.");
     } finally {
@@ -312,29 +323,41 @@ function UsersPage({ currentUserId }: { currentUserId: string }) {
   if (error) return <p className={styles.adminUsersError}>{error}</p>;
   if (!users) return <p className={styles.adminUsersLoading}>Loading…</p>;
 
+  const pendingUser = pendingDeleteId ? users.find((u) => u.id === pendingDeleteId) : null;
+
   return (
-    <div className={styles.adminUsers}>
-      {users.map((u) => (
-        <div key={u.id} className={styles.adminUserRow}>
-          <div className={styles.adminUserInfo}>
-            <span className={styles.adminUserName}>{u.display_name}</span>
-            {u.is_admin && <span className={styles.adminUserBadge}>Admin</span>}
-            <span className={styles.adminUserEmail}>
-              {u.email ?? <em className={styles.adminUserEmailUnset}>no email set</em>}
-            </span>
+    <>
+      <div className={styles.adminUsers}>
+        {users.map((u) => (
+          <div key={u.id} className={styles.adminUserRow}>
+            <div className={styles.adminUserInfo}>
+              <span className={styles.adminUserName}>{u.display_name}</span>
+              {u.is_admin && <span className={styles.adminUserBadge}>Admin</span>}
+              <span className={styles.adminUserEmail}>
+                {u.email ?? <em className={styles.adminUserEmailUnset}>no email set</em>}
+              </span>
+            </div>
+            {u.id !== currentUserId && (
+              <button
+                className={styles.adminUserDelete}
+                onClick={() => setPendingDeleteId(u.id)}
+                disabled={deleting === u.id}
+                aria-label={`Delete ${u.display_name}`}
+              >
+                {deleting === u.id ? "…" : "Delete"}
+              </button>
+            )}
           </div>
-          {u.id !== currentUserId && (
-            <button
-              className={styles.adminUserDelete}
-              onClick={() => handleDelete(u)}
-              disabled={deleting === u.id}
-              aria-label={`Delete ${u.display_name}`}
-            >
-              {deleting === u.id ? "…" : "Delete"}
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+
+      {pendingUser && (
+        <ConfirmModal
+          message={`Delete account "${pendingUser.display_name}"? This cannot be undone.`}
+          onConfirm={() => { void handleDelete(pendingUser.id); }}
+          onClose={() => setPendingDeleteId(null)}
+        />
+      )}
+    </>
   );
 }

@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use wrazz_server::User;
+use crate::User;
 
 // --- Workspace queries ---
 

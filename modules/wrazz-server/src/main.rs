@@ -1,8 +1,3 @@
-mod db;
-mod routes;
-mod state;
-mod store_cache;
-
 use std::{sync::Arc, time::Duration};
 
 use argon2::{
@@ -12,8 +7,11 @@ use argon2::{
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use tokio::sync::RwLock;
 
-use crate::routes::oidc::OidcProvider;
-use state::AppState;
+use wrazz_server::db;
+use wrazz_server::routes;
+use wrazz_server::routes::oidc::OidcProvider;
+use wrazz_server::state::AppState;
+use wrazz_server::store_cache;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

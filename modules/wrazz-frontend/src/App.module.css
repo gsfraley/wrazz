@@ -24,7 +24,7 @@
   cursor: col-resize;
   position: relative;
   background:
-    linear-gradient(to bottom, var(--paper-topbar) 60px, transparent 60px),
+    linear-gradient(to bottom, var(--paper-topbar) var(--topbar-height), transparent var(--topbar-height)),
     linear-gradient(to right, var(--paper-sidebar) 50%, var(--paper) 50%);
 }
 
@@ -38,8 +38,8 @@
   transform: translateX(-50%);
   background: linear-gradient(
     to bottom,
-    var(--border-strong) 60px,
-    var(--border) 60px
+    var(--border-strong) var(--topbar-height),
+    var(--border) var(--topbar-height)
   );
   transition: background 0.1s;
 }
@@ -48,8 +48,8 @@
 .sidebarResizer:active::before {
   background: linear-gradient(
     to bottom,
-    var(--border-strong) 60px,
-    var(--border-strong) 60px
+    var(--border-strong) var(--topbar-height),
+    var(--border-strong) var(--topbar-height)
   );
 }
 
@@ -58,7 +58,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: 59px;
+  top: calc(var(--topbar-height) - 1px);
   height: 1px;
   background: var(--border-strong);
 }

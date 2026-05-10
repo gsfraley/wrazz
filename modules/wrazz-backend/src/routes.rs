@@ -34,6 +34,7 @@ pub fn router(backend: Arc<dyn Backend>, workspace_id: String) -> Router {
         .route("/dirs/{*path}", post(create_dir));
 
     let api = Router::new()
+        .route("/version", get(get_version))
         .merge(entry_routes)
         .merge(file_routes)
         .merge(content_routes)
@@ -43,6 +44,14 @@ pub fn router(backend: Arc<dyn Backend>, workspace_id: String) -> Router {
         .nest("/api", api)
         .layer(CorsLayer::permissive())
         .with_state(state)
+}
+
+// --- Version ---
+
+async fn get_version() -> Json<crate::VersionResponse> {
+    Json(crate::VersionResponse {
+        version: env!("CARGO_PKG_VERSION"),
+    })
 }
 
 // --- Error mapping ---

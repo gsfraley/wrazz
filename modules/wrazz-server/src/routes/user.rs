@@ -12,7 +12,7 @@ use argon2::{
 use axum::{Json, extract::{Path, State}, http::StatusCode};
 use serde::Deserialize;
 use uuid::Uuid;
-use wrazz_server::User;
+use crate::User;
 
 use super::auth::AuthUser;
 use crate::db;

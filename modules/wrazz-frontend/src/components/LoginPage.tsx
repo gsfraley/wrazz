@@ -1,8 +1,8 @@
-import { useState, useEffect, FormEvent } from "react";
-import { login } from "../api/auth";
-import { getOidcStatus } from "../api/admin";
-import type { CurrentUser } from "../api/auth";
-import styles from "./LoginPage.module.css";
+import { useState, useEffect, type FormEvent } from "react";
+import { login } from "@/api/auth";
+import { getOidcStatus } from "@/api/admin";
+import type { CurrentUser } from "@/api/auth";
+import styles from "@/components/LoginPage.module.css";
 
 export interface LoginPageProps {
   onLogin: (user: CurrentUser) => void;

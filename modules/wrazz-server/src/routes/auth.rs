@@ -3,7 +3,7 @@ use axum::{Json, extract::{FromRef, State}, http::StatusCode};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 use serde::Deserialize;
 use uuid::Uuid;
-use wrazz_server::User;
+use crate::User;
 
 use crate::db;
 use crate::state::AppState;

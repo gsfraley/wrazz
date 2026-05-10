@@ -35,3 +35,7 @@ reqwest = { workspace = true }
 async_zip = { version = "0.0.17", features = ["deflate", "tokio"] }
 tokio-util = { version = "0.7", features = ["io", "compat"] }
 futures-util = "0.3"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+tempfile = "3"

@@ -16,8 +16,16 @@
 
 pub mod http_backend;
 pub mod local_backend;
+pub mod routes;
 pub mod store;
 
 pub use http_backend::HttpBackend;
 pub use local_backend::LocalBackend;
 pub use store::{Store, StoreError, slugify};
+
+/// Shared API response type for `GET /api/version` in both the standalone
+/// binary and wrazz-server.
+#[derive(serde::Serialize)]
+pub struct VersionResponse {
+    pub version: &'static str,
+}

@@ -1,5 +1,8 @@
 /// Assembles the full Axum router.
 ///
+/// Version routes (open, no auth):
+/// - `GET  /api/version`
+///
 /// Auth routes (open):
 /// - `POST /api/auth/login`, `POST /api/auth/logout`
 /// - `GET  /api/auth/oidc/redirect`, `GET /api/auth/oidc/callback`
@@ -23,6 +26,7 @@ pub mod export;
 pub mod files;
 pub mod oidc;
 pub mod user;
+pub mod version;
 
 use axum::{
     Router,
@@ -70,6 +74,7 @@ pub fn router(state: AppState, static_dir: Option<String>) -> Router {
         .route("/export/dir/{*path}", get(export::export_dir));
 
     let api = Router::new()
+        .route("/version", get(version::get_version))
         .nest("/auth", auth_routes)
         .merge(user_routes)
         .merge(admin_routes)

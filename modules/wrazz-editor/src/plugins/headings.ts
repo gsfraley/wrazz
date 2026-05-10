@@ -45,12 +45,23 @@ export const heading: ContentPlugin = {
   },
 
   transformLine(line, isCaretLine, _caretCol) {
-    const m = line.match(/^(#+)([^# \n])/);
-    if (!m) return null;
-    return {
-      line: m[1] + " " + line.slice(m[1].length),
-      colDelta: isCaretLine ? -m[1].length : 0,
-    };
+    // "##text" → "## text"
+    const mJoined = line.match(/^(#+)([^# \n])/);
+    if (mJoined) {
+      return {
+        line: mJoined[1] + " " + line.slice(mJoined[1].length),
+        colDelta: isCaretLine ? -mJoined[1].length : 0,
+      };
+    }
+    // "#" alone → "# " and place caret at col 0 so heading mode activates immediately
+    const mBare = line.match(/^(#+)$/);
+    if (mBare) {
+      return {
+        line: mBare[1] + " ",
+        colDelta: isCaretLine ? -mBare[1].length : 0,
+      };
+    }
+    return null;
   },
 
   onKeyboardEvent(e, ctx) {

@@ -1,5 +1,3 @@
-mod routes;
-
 use std::sync::Arc;
 
 use uuid::Uuid;
@@ -33,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-    let app = routes::router(backend, workspace_id);
+    let app = wrazz_backend::routes::router(backend, workspace_id);
 
     let listener = tokio::net::TcpListener::bind(&bind).await?;
     tracing::info!("listening on http://{bind}");

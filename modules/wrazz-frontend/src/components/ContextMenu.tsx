@@ -1,7 +1,7 @@
-import { JSX, useEffect, useRef } from "react";
-import { IconProps } from "../icons";
-import styles from "./ContextMenu.module.css";
-import { cx } from "../lib/utils";
+import { type JSX, useEffect, useRef } from "react";
+import type { IconProps } from "@/icons";
+import styles from "@/components/ContextMenu.module.css";
+import { cx } from "@/lib/utils";
 
 export type ContextMenuItem =
   | { type: "item", label: string, danger?: boolean, icon?: (props: IconProps) => JSX.Element, onClick: () => void }

@@ -1,16 +1,7 @@
-import { createContext, useContext } from "react";
-import type { ActionContext } from "./actions";
-
-interface ActiveContextValue {
-  ctx: ActionContext | null;
-  setCtx: (c: ActionContext | null) => void;
-}
-
-export const ActiveContextCtx = createContext<ActiveContextValue>({
-  ctx: null,
-  setCtx: () => {},
-});
+import { useUIStore } from "@/stores/uiStore";
 
 export function useActiveContext() {
-  return useContext(ActiveContextCtx);
+  const ctx = useUIStore((s) => s.activeCtx);
+  const setCtx = useUIStore((s) => s.setActiveCtx);
+  return { ctx, setCtx };
 }

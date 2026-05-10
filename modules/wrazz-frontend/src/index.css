@@ -58,6 +58,7 @@
   --border:        #e0d9cc;
   --border-strong: #c8c0b0;
   --danger:        #a03030;
+  --topbar-height: 60px;
 
   /* Bridge wrazz-editor custom properties to the app theme */
   --we-ink:       var(--ink);

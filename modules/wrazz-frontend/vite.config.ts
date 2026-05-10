@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
       "wrazz-editor": fileURLToPath(
         new URL("../wrazz-editor/src/index.ts", import.meta.url)
       ),

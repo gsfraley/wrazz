@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import styles from "./Modal.module.css";
-import { cx } from "../../lib/utils";
+import styles from "@/components/modals/Modal.module.css";
+import { cx } from "@/lib/utils";
 
 export interface ModalProps {
   title: string;

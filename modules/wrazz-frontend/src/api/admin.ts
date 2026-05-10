@@ -1,3 +1,5 @@
+import { apiFetch } from "@/lib/apiError";
+
 /// Sentinel returned in the client_secret field when a secret is already stored.
 /// Send this value back unchanged to preserve the existing secret on PUT.
 export const SECRET_REDACTED = "••••";
@@ -20,35 +22,32 @@ export interface OidcStatus {
 }
 
 export async function getOidcConfig(): Promise<OidcConfig> {
-  const resp = await fetch("/api/admin/oidc");
-  if (!resp.ok) throw new Error(`get oidc config failed: ${resp.status}`);
+  const resp = await apiFetch("/api/admin/oidc");
   return resp.json();
 }
 
 export async function saveOidcConfig(
   config: Pick<OidcConfig, "issuer_url" | "client_id" | "client_secret" | "redirect_uri" | "enabled">
 ): Promise<OidcConfig> {
-  const resp = await fetch("/api/admin/oidc", {
+  const resp = await apiFetch("/api/admin/oidc", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(config),
   });
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(text || `save failed: ${resp.status}`);
-  }
   return resp.json();
 }
 
 export async function deleteOidcConfig(): Promise<void> {
-  const resp = await fetch("/api/admin/oidc", { method: "DELETE" });
-  if (!resp.ok) throw new Error(`delete oidc config failed: ${resp.status}`);
+  await apiFetch("/api/admin/oidc", { method: "DELETE" });
 }
 
 export async function getOidcStatus(): Promise<OidcStatus> {
-  const resp = await fetch("/api/auth/oidc/status");
-  if (!resp.ok) return { enabled: false };
-  return resp.json();
+  try {
+    const resp = await apiFetch("/api/auth/oidc/status");
+    return resp.json();
+  } catch {
+    return { enabled: false };
+  }
 }
 
 export interface AdminUser {
@@ -60,12 +59,10 @@ export interface AdminUser {
 }
 
 export async function listUsers(): Promise<AdminUser[]> {
-  const resp = await fetch("/api/admin/users");
-  if (!resp.ok) throw new Error(`list users failed: ${resp.status}`);
+  const resp = await apiFetch("/api/admin/users");
   return resp.json();
 }
 
 export async function deleteUser(id: string): Promise<void> {
-  const resp = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
-  if (!resp.ok) throw new Error(`delete user failed: ${resp.status}`);
+  await apiFetch(`/api/admin/users/${id}`, { method: "DELETE" });
 }

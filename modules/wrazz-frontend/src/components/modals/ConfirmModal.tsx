@@ -1,6 +1,6 @@
-import Modal from "./Modal";
-import styles from "./ConfirmModal.module.css";
-import { cx } from "../../lib/utils";
+import Modal from "@/components/modals/Modal";
+import styles from "@/components/modals/ConfirmModal.module.css";
+import { cx } from "@/lib/utils";
 
 export interface ConfirmModalProps {
   message: string;

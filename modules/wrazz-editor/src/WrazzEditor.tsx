@@ -5,6 +5,7 @@ import { valueToHtml, extractText } from "./renderer";
 import { saveCaretPos, restoreCaretPos } from "./caret";
 import { PLUGINS, LINE_PREFIX_PLUGINS } from "./plugins/index";
 import type { ContentPlugin, PluginContext, CaretPos } from "./plugins/index";
+import { buildCopyText } from "./copy";
 
 export interface WrazzEditorProps {
   value: string;
@@ -26,23 +27,6 @@ function activatablePluginForElement(el: HTMLElement): ContentPlugin | null {
   if (!pluginEl) return null;
   const name = pluginEl.dataset.wePlugin;
   return PLUGINS.find((p) => p.name === name && p.interaction.activation) ?? null;
-}
-
-// ── Copy helper ────────────────────────────────────────────────
-
-// Count editable characters in a cloned DOM fragment (skip contenteditable=false).
-function countEditableChars(frag: DocumentFragment | Element): number {
-  let n = 0;
-  const walk = (node: Node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      n += (node.textContent ?? "").length;
-      return;
-    }
-    if ((node as Element).getAttribute?.("contenteditable") === "false") return;
-    for (const child of node.childNodes) walk(child);
-  };
-  walk(frag);
-  return n;
 }
 
 // ── Component ──────────────────────────────────────────────────
@@ -242,80 +226,12 @@ export function WrazzEditor({
   // markdown source for the covered lines instead.
 
   const handleCopy = (e: React.ClipboardEvent<HTMLDivElement>) => {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    if (range.collapsed) return;
-
     const el = editorRef.current;
     if (!el) return;
-    const lineCount = el.children.length;
-    if (lineCount === 0) return;
-
-    // Find the line div index for a selection endpoint.
-    // When container === el (e.g. Ctrl+A), the offset is a child index; clamp
-    // to valid range. If the walk escapes above el (shouldn't happen), fall back.
-    const lineIdxOf = (node: Node, fallback: number): number => {
-      if (node === el) {
-        return Math.max(0, Math.min(fallback, lineCount - 1));
-      }
-      let n: Node | null = node;
-      while (n && n.parentNode !== el) n = n.parentNode;
-      if (!n) return Math.max(0, Math.min(fallback, lineCount - 1));
-      const idx = Array.prototype.indexOf.call(el.children, n);
-      return idx >= 0 ? idx : Math.max(0, Math.min(fallback, lineCount - 1));
-    };
-
-    const startIdx = lineIdxOf(range.startContainer, 0);
-    const endIdx = lineIdxOf(range.endContainer, lineCount - 1);
-
-    // Count content-relative editable chars from start of lineEl to a DOM point.
-    // Returns Infinity when the range can't be constructed (treat as end-of-line).
-    const colAt = (lineEl: HTMLElement, container: Node, offset: number): number => {
-      try {
-        const m = document.createRange();
-        m.setStart(lineEl, 0);
-        m.setEnd(container, offset);
-        return countEditableChars(m.cloneContents());
-      } catch {
-        return Infinity;
-      }
-    };
-
-    const startCol = colAt(
-      el.children[startIdx] as HTMLElement,
-      range.startContainer,
-      range.startOffset
-    );
-    const endCol = colAt(
-      el.children[endIdx] as HTMLElement,
-      range.endContainer,
-      range.endOffset
-    );
-
-    const srcLines = valueRef.current.split("\n");
-    const pfxLen = (i: number) => {
-      const m = (srcLines[i] ?? "").match(/^(#{1,6}) /);
-      return m ? m[0].length : 0;
-    };
-
-    const parts: string[] = [];
-    for (let i = startIdx; i <= endIdx; i++) {
-      const line = srcLines[i] ?? "";
-      const pfx = pfxLen(i);
-      // Include the heading prefix when the selection reaches col 0 of content.
-      const from = i === startIdx
-        ? (startCol === 0 ? 0 : Math.min(pfx + startCol, line.length))
-        : 0;
-      // Math.min handles Infinity (container === el fallthrough → full line).
-      const to = i === endIdx
-        ? Math.min(pfx + endCol, line.length)
-        : line.length;
-      parts.push(line.slice(from, to));
-    }
-
+    const text = buildCopyText(el, valueRef.current);
+    if (text === null) return;
     e.preventDefault();
-    e.clipboardData.setData("text/plain", parts.join("\n"));
+    e.clipboardData.setData("text/plain", text);
   };
 
   // ── Blur ────────────────────────────────────────────────────
@@ -329,7 +245,18 @@ export function WrazzEditor({
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
     e.preventDefault();
     const text = e.clipboardData.getData("text/plain");
-    document.execCommand("insertText", false, text);
+    if (!text) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    const textNode = document.createTextNode(text);
+    range.insertNode(textNode);
+    range.setStartAfter(textNode);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    handleInput();
   };
 
   // ── Render ──────────────────────────────────────────────────

@@ -1,45 +1,26 @@
-import { FileEntry } from "../api/files";
-import { Draft } from "../types";
+import { useDocumentStore } from "@/stores/documentStore";
+import { useUIStore } from "@/stores/uiStore";
 import { WrazzEditor } from "wrazz-editor";
-import { useActiveContext } from "../lib/context";
-import { pathToDisplayTitle } from "../lib/utils";
-import styles from "./Editor.module.css";
-import { cx } from "../lib/utils";
+import { pathToDisplayTitle, cx } from "@/lib/utils";
+import styles from "@/components/Editor.module.css";
 
-export type { Draft };
-
-export interface EditorProps {
-  file: FileEntry | null;
-  draft: Draft | null;
-  activePath: string | null;
-  isDirty: boolean;
-  onChange: (draft: Draft) => void;
-  onSave: () => void;
-}
-
-export default function Editor({
-  file,
-  draft,
-  activePath,
-  isDirty,
-  onChange,
-  onSave,
-}: EditorProps) {
-  const { setCtx } = useActiveContext();
+export default function Editor() {
+  const { activeFile, draft, activePath, isDirty, changeDraft, saveFile } = useDocumentStore();
+  const { setActiveCtx } = useUIStore();
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key === "s") {
       e.preventDefault();
-      onSave();
+      void saveFile();
     }
   }
 
   return (
-    <main className={styles.editor} onKeyDown={handleKeyDown} onClick={() => setCtx("editor")}>
-      <div className={cx(styles.editorUnsavedBar, isDirty && file && styles.isDirty)}>
-        {isDirty && file && <span className={styles.editorUnsavedMsg}>Unsaved changes</span>}
+    <main className={styles.editor} onKeyDown={handleKeyDown} onClick={() => setActiveCtx("editor")}>
+      <div className={cx(styles.editorUnsavedBar, isDirty && activeFile && styles.isDirty)}>
+        {isDirty && activeFile && <span className={styles.editorUnsavedMsg}>Unsaved changes</span>}
       </div>
-      {!file || !draft ? (
+      {!activeFile || !draft ? (
         <div className={styles.editorEmpty}>Select a file or create a new one.</div>
       ) : (
         <div className={styles.editorBody}>
@@ -47,13 +28,13 @@ export default function Editor({
             <input
               className={styles.editorTitle}
               value={draft.title}
-              onChange={(e) => onChange({ ...draft, title: e.target.value })}
+              onChange={(e) => changeDraft({ ...draft, title: e.target.value })}
               placeholder={activePath ? pathToDisplayTitle(activePath) : "Title"}
             />
           </div>
           <WrazzEditor
             value={draft.content}
-            onChange={(content) => onChange({ ...draft, content })}
+            onChange={(content) => changeDraft({ ...draft, content })}
             placeholder="Start writing…"
           />
         </div>

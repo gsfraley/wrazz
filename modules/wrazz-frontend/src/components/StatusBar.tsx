@@ -1,12 +1,11 @@
-import { AppStatus } from "../types";
-import styles from "./StatusBar.module.css";
+import { useDocumentStore } from "@/stores/documentStore";
+import { pathToDisplayTitle } from "@/lib/utils";
+import styles from "@/components/StatusBar.module.css";
 
-export interface StatusBarProps {
-  title: string | null;
-  status: AppStatus | null;
-}
+export default function StatusBar() {
+  const { activePath, draft, status } = useDocumentStore();
+  const title = draft?.title || (activePath ? pathToDisplayTitle(activePath) : null);
 
-export default function StatusBar({ title, status }: StatusBarProps) {
   return (
     <footer className={styles.statusBar}>
       <span className={status?.kind === "error" ? styles.statusError : ""}>

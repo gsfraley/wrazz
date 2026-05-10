@@ -107,7 +107,7 @@ export function extractText(root: HTMLElement): string {
   for (const child of root.childNodes) {
     if (child.nodeType === Node.TEXT_NODE) {
       lines.push(child.textContent ?? "");
-    } else if ((child as Element).tagName === "DIV") {
+    } else if ((child as Element).classList?.contains("we-line")) {
       lines.push(extractLineText(child as Element));
     }
   }

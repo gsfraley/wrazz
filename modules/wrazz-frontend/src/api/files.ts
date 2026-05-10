@@ -1,3 +1,5 @@
+import { apiFetch } from "@/lib/apiError";
+
 export interface FileEntry {
   path: string;
   title: string | null;
@@ -24,22 +26,19 @@ function pathToUrl(path: string): string {
   return path.replace(/^\/|\/$/g, "");
 }
 
-export async function listEntries(path: string = "/"): Promise<Entry[]> {
+export async function listEntries(path = "/"): Promise<Entry[]> {
   const params = new URLSearchParams({ path });
-  const resp = await fetch(`/api/entries?${params}`);
-  if (!resp.ok) throw new Error(`list failed: ${resp.status}`);
+  const resp = await apiFetch(`/api/entries?${params}`);
   return resp.json();
 }
 
 export async function getFile(path: string): Promise<FileEntry> {
-  const resp = await fetch(`/api/files/${pathToUrl(path)}`);
-  if (!resp.ok) throw new Error(`get failed: ${resp.status}`);
+  const resp = await apiFetch(`/api/files/${pathToUrl(path)}`);
   return resp.json();
 }
 
 export async function getFileContent(path: string): Promise<FileContent> {
-  const resp = await fetch(`/api/content/${pathToUrl(path)}`);
-  if (!resp.ok) throw new Error(`get content failed: ${resp.status}`);
+  const resp = await apiFetch(`/api/content/${pathToUrl(path)}`);
   return resp.json();
 }
 
@@ -49,12 +48,11 @@ export async function createFile(
   tags: string[],
   content: string,
 ): Promise<FileEntry> {
-  const resp = await fetch(`/api/files/${pathToUrl(path)}`, {
+  const resp = await apiFetch(`/api/files/${pathToUrl(path)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title, tags, content }),
   });
-  if (!resp.ok) throw new Error(`create failed: ${resp.status}`);
   return resp.json();
 }
 
@@ -64,37 +62,41 @@ export async function updateFile(
   tags: string[],
   content: string,
 ): Promise<FileEntry> {
-  const resp = await fetch(`/api/files/${pathToUrl(path)}`, {
+  const resp = await apiFetch(`/api/files/${pathToUrl(path)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title, tags, content }),
   });
-  if (!resp.ok) throw new Error(`update failed: ${resp.status}`);
   return resp.json();
 }
 
 export async function deleteEntry(path: string): Promise<void> {
-  const resp = await fetch(`/api/entries/${pathToUrl(path)}`, {
-    method: "DELETE",
-  });
-  if (!resp.ok) throw new Error(`delete failed: ${resp.status}`);
+  await apiFetch(`/api/entries/${pathToUrl(path)}`, { method: "DELETE" });
 }
 
 export async function createDir(path: string): Promise<void> {
-  const resp = await fetch(`/api/dirs/${pathToUrl(path)}`, {
-    method: "POST",
-  });
-  if (!resp.ok) throw new Error(`create dir failed: ${resp.status}`);
+  await apiFetch(`/api/dirs/${pathToUrl(path)}`, { method: "POST" });
 }
 
-export async function moveEntry(
-  fromPath: string,
-  toPath: string,
-): Promise<void> {
-  const resp = await fetch(`/api/entries/${pathToUrl(fromPath)}`, {
+export async function moveEntry(fromPath: string, toPath: string): Promise<void> {
+  await apiFetch(`/api/entries/${pathToUrl(fromPath)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ to_path: toPath }),
   });
-  if (!resp.ok) throw new Error(`move failed: ${resp.status}`);
+}
+
+export async function listAllFilePaths(path = "/"): Promise<string[]> {
+  const entries = await listEntries(path).catch(() => []);
+  const paths: string[] = [];
+  await Promise.all(
+    entries.map(async (e) => {
+      if (e.kind === "file") {
+        paths.push(e.path);
+      } else {
+        paths.push(...(await listAllFilePaths(e.path)));
+      }
+    }),
+  );
+  return paths;
 }

@@ -15,9 +15,12 @@
 //!
 //! # Public types
 //!
-//! Only [`User`] is exported from the library target. Everything else
-//! (handlers, state, DB queries) lives in the binary's own module tree and
-//! is not part of any public API.
+//! [`User`] plus the internal modules needed by integration tests.
+
+pub mod db;
+pub mod routes;
+pub mod state;
+pub mod store_cache;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

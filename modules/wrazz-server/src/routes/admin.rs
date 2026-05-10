@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{Json, extract::{Path, State}, http::StatusCode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use wrazz_server::User;
+use crate::User;
 
 use crate::db::{self, OidcConfig};
 use crate::routes::auth::AuthUser;

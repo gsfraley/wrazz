@@ -1,9 +1,9 @@
-import { FormEvent, useState } from "react";
-import type { CurrentUser } from "../../api/auth";
-import { updateSelf } from "../../api/user";
-import Modal from "./Modal";
-import styles from "./ProfileModal.module.css";
-import { cx } from "../../lib/utils";
+import { type FormEvent, useState } from "react";
+import type { CurrentUser } from "@/api/auth";
+import { updateSelf } from "@/api/user";
+import Modal from "@/components/modals/Modal";
+import styles from "@/components/modals/ProfileModal.module.css";
+import { cx } from "@/lib/utils";
 
 export interface ProfileModalProps {
   user: CurrentUser;
