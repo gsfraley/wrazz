@@ -1,17 +1,16 @@
 import { type FormEvent, useState } from "react";
-import type { CurrentUser } from "@/api/auth";
 import { updateSelf } from "@/api/user";
+import { useUIStore } from "@/stores/uiStore";
 import Modal from "@/components/modals/Modal";
 import styles from "@/components/modals/ProfileModal.module.css";
 import { cx } from "@/lib/utils";
 
 export interface ProfileModalProps {
-  user: CurrentUser;
   onClose: () => void;
-  onUpdated: (user: CurrentUser) => void;
 }
 
-export default function ProfileModal({ user, onClose, onUpdated }: ProfileModalProps) {
+export default function ProfileModal({ onClose }: ProfileModalProps) {
+  const user = useUIStore((s) => s.user)!;
   const [email, setEmail] = useState(user.email ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +29,7 @@ export default function ProfileModal({ user, onClose, onUpdated }: ProfileModalP
     setSuccess(null);
     try {
       const updated = await updateSelf(email.trim() || null);
-      onUpdated(updated);
+      useUIStore.getState().setUser(updated);
       setEmail(updated.email ?? "");
       setSuccess("Email saved.");
     } catch (err) {

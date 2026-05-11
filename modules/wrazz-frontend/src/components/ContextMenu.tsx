@@ -1,10 +1,9 @@
-import { type JSX, useEffect, useRef } from "react";
-import type { IconProps } from "@/icons";
+import { type ComponentType, useEffect, useRef } from "react";
 import styles from "@/components/ContextMenu.module.css";
 import { cx } from "@/lib/utils";
 
 export type ContextMenuItem =
-  | { type: "item", label: string, danger?: boolean, icon?: (props: IconProps) => JSX.Element, onClick: () => void }
+  | { type: "item", label: string, danger?: boolean, icon?: ComponentType<{ size?: number }>, onClick: () => void }
   | { type: "separator" }
 
 export interface ContextMenuProps {
@@ -52,7 +51,7 @@ export default function ContextMenu({ vertical, horizontal, items, onClose }: Co
               onClick={() => { item.onClick(); onClose(); }}
             >
               {item.label}
-              {item.icon && item.icon({ size: 13 })}
+              {item.icon && <item.icon size={13} />}
             </button>
           );
           case "separator": return (

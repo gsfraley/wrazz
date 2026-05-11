@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { useUIStore } from "@/stores/uiStore";
 import Modal from "@/components/modals/Modal";
 import ConfirmModal from "@/components/modals/ConfirmModal";
 import styles from "@/components/modals/AdminModal.module.css";
@@ -18,10 +19,9 @@ type AdminPage = "info" | "sso" | "users";
 
 export interface AdminModalProps {
   onClose: () => void;
-  currentUserId: string;
 }
 
-export default function AdminModal({ onClose, currentUserId }: AdminModalProps) {
+export default function AdminModal({ onClose }: AdminModalProps) {
   const [page, setPage] = useState<AdminPage>("info");
 
   return (
@@ -50,7 +50,7 @@ export default function AdminModal({ onClose, currentUserId }: AdminModalProps) 
         <div className={styles.adminSection}>
           {page === "info" && <InfoPage />}
           {page === "sso" && <SsoPage />}
-          {page === "users" && <UsersPage currentUserId={currentUserId} />}
+          {page === "users" && <UsersPage />}
         </div>
       </div>
     </Modal>
@@ -61,7 +61,7 @@ function InfoPage() {
   return (
     <div>
       <p className={styles.adminInfoName}>wrazz</p>
-      <p className={styles.adminInfoVersion}>version 0.1.6</p>
+      <p className={styles.adminInfoVersion}>version 0.1.7</p>
       <p className={styles.adminInfoDesc}>
         Self-hosted personal journal built around plain Markdown files.
       </p>
@@ -296,7 +296,8 @@ function SsoPage() {
   );
 }
 
-function UsersPage({ currentUserId }: { currentUserId: string }) {
+function UsersPage() {
+  const currentUserId = useUIStore((s) => s.user?.id ?? "");
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);

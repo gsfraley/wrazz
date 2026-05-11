@@ -1,6 +1,6 @@
 {
   "name": "wrazz-editor",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "type": "module",
   "description": "Embeddable source-mode Markdown editor with paper-feel typography",
   "license": "MIT",

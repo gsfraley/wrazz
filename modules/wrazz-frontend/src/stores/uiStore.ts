@@ -1,16 +1,41 @@
 import { create } from "zustand";
 import { assertNever } from "@/lib/utils";
-import type { ActionContext } from "@/lib/actions";
+import { logout as logoutApi } from "@/api/auth";
+import type { CurrentUser } from "@/api/auth";
+import type { ActiveContext } from "@/lib/plugin";
 import type { ContextMenuProps, ContextMenuItem } from "@/components/ContextMenu";
 import type { VerticalAnchor, HorizontalAnchor } from "@/lib/contextMenu";
+import { useDocumentStore } from "@/stores/documentStore";
+
+export type { ActiveContext };
+
+const SIDEBAR_MIN = 160;
+const SIDEBAR_MAX = 520;
+export const SIDEBAR_DEFAULT = 240;
 
 interface UIState {
   sidebarWidth: number;
-  activeCtx: ActionContext | null;
+  activeCtx: ActiveContext;
   ctxMenu: ContextMenuProps | null;
 
+  // Auth
+  user: CurrentUser | null;
+
+  // Modals
+  activeModal: "profile" | "admin" | null;
+
+  // Inline rename trigger (set by plugin/tree ops; consumed by useFileTreeOperations)
+  inlineEditPath: string | null;
+
+  // Command palette
+  paletteOpen: boolean;
+
+  // Confirm dialog
+  confirmRequest: { message: string; resolve: (ok: boolean) => void } | null;
+
+  // Actions
   setSidebarWidth: (w: number) => void;
-  setActiveCtx: (ctx: ActionContext | null) => void;
+  setActiveCtx: (ctx: ActiveContext) => void;
   openCtxMenu: (
     e: React.MouseEvent,
     items: ContextMenuItem[],
@@ -18,16 +43,25 @@ interface UIState {
     horizontal?: HorizontalAnchor,
   ) => void;
   closeCtxMenu: () => void;
+  setUser: (user: CurrentUser | null) => void;
+  openModal: (id: "profile" | "admin") => void;
+  closeModal: () => void;
+  setInlineEditPath: (path: string | null) => void;
+  setPaletteOpen: (open: boolean) => void;
+  openConfirm: (message: string) => Promise<boolean>;
+  closeConfirm: (ok: boolean) => void;
+  performLogout: () => Promise<void>;
 }
 
-const SIDEBAR_MIN = 160;
-const SIDEBAR_MAX = 520;
-export const SIDEBAR_DEFAULT = 240;
-
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>((set, get) => ({
   sidebarWidth: SIDEBAR_DEFAULT,
   activeCtx: null,
   ctxMenu: null,
+  user: null,
+  activeModal: null,
+  inlineEditPath: null,
+  paletteOpen: false,
+  confirmRequest: null,
 
   setSidebarWidth: (w) =>
     set({ sidebarWidth: Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, w)) }),
@@ -64,4 +98,33 @@ export const useUIStore = create<UIState>((set) => ({
   },
 
   closeCtxMenu: () => set({ ctxMenu: null }),
+
+  setUser: (user) => set({ user }),
+
+  openModal: (id) => set({ activeModal: id }),
+
+  closeModal: () => set({ activeModal: null }),
+
+  setInlineEditPath: (path) => set({ inlineEditPath: path }),
+
+  setPaletteOpen: (open) => set({ paletteOpen: open }),
+
+  openConfirm: (message) =>
+    new Promise<boolean>((resolve) => {
+      set({ confirmRequest: { message, resolve } });
+    }),
+
+  closeConfirm: (ok) => {
+    const { confirmRequest } = get();
+    if (confirmRequest) {
+      confirmRequest.resolve(ok);
+      set({ confirmRequest: null });
+    }
+  },
+
+  performLogout: async () => {
+    await logoutApi();
+    set({ user: null });
+    useDocumentStore.getState().closeFile();
+  },
 }));

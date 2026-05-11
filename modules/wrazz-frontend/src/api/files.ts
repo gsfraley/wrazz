@@ -100,3 +100,23 @@ export async function listAllFilePaths(path = "/"): Promise<string[]> {
   );
   return paths;
 }
+
+export interface FileSummary {
+  path: string;
+  title: string | null;
+}
+
+export async function listAllFiles(path = "/"): Promise<FileSummary[]> {
+  const entries = await listEntries(path).catch(() => []);
+  const files: FileSummary[] = [];
+  await Promise.all(
+    entries.map(async (e) => {
+      if (e.kind === "file") {
+        files.push({ path: e.path, title: e.title });
+      } else {
+        files.push(...(await listAllFiles(e.path)));
+      }
+    }),
+  );
+  return files;
+}

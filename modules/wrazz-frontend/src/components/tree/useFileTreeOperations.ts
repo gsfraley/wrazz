@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { createFile, createDir, deleteEntry, moveEntry } from "@/api/files";
+import { moveEntry } from "@/api/files";
 import { useTreeStore } from "@/stores/treeStore";
 import { useDocumentStore } from "@/stores/documentStore";
-import { ApiError } from "@/lib/apiError";
+import { useUIStore } from "@/stores/uiStore";
 
 function entryName(path: string): string {
   const clean = path.endsWith("/") ? path.slice(0, -1) : path;
@@ -21,13 +21,10 @@ export interface FileTreeOps {
   editingPath: string | null;
   editValue: string;
   editInputRef: React.RefObject<HTMLInputElement | null>;
+  setEditValue: (v: string) => void;
   startEdit: (path: string) => void;
   commitEdit: () => Promise<void>;
   cancelEdit: () => void;
-  setEditValue: (v: string) => void;
-  newFile: (parentPath?: string) => Promise<void>;
-  newDir: (parentPath?: string) => Promise<void>;
-  deleteEntry: (path: string) => Promise<void>;
   moveEntry: (src: string, destDir: string) => Promise<void>;
 }
 
@@ -36,10 +33,21 @@ export function useFileTreeOperations(): FileTreeOps {
   const [editValue, setEditValue] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  const { ensureExpanded, refreshDir, collapseDir } = useTreeStore();
-  const { activePath, openFile, closeFile } = useDocumentStore();
+  const { refreshDir, collapseDir } = useTreeStore();
+  const { activePath, openFile } = useDocumentStore();
+  const { inlineEditPath, setInlineEditPath } = useUIStore();
 
-  // Focus and select the edit input whenever editingPath changes.
+  // Consume inlineEditPath from uiStore to start inline rename.
+  // Set by plugins (Rename context menu item, createFile/createDir after creation).
+  useEffect(() => {
+    if (inlineEditPath !== null) {
+      setEditingPath(inlineEditPath);
+      setEditValue(entryName(inlineEditPath));
+      setInlineEditPath(null);
+    }
+  }, [inlineEditPath, setInlineEditPath]);
+
+  // Focus and select the input whenever editingPath changes.
   useEffect(() => {
     const input = editInputRef.current;
     if (!editingPath || !input) return;
@@ -77,65 +85,9 @@ export function useFileTreeOperations(): FileTreeOps {
       await moveEntry(editingPath, newPath);
       if (isDir) collapseDir(editingPath);
       await refreshDir(parent);
-      if (!isDir && editingPath === activePath) {
-        await openFile(newPath);
-      }
+      if (!isDir && editingPath === activePath) await openFile(newPath);
     } catch {
       // Silently revert — TODO: surface via notification system
-    }
-  }
-
-  async function doNewFile(parentPath = "/") {
-    if (parentPath !== "/") await ensureExpanded(parentPath);
-    const dir = parentPath === "/" ? "" : parentPath.replace(/\/$/, "");
-    for (let i = 0; i <= 9; i++) {
-      const name = i === 0 ? "untitled.md" : `untitled-${i + 1}.md`;
-      const path = `${dir}/${name}`;
-      try {
-        const file = await createFile(path, null, [], "");
-        await refreshDir(parentPath);
-        setEditingPath(file.path);
-        setEditValue(entryName(file.path));
-        await openFile(file.path);
-        return;
-      } catch (err) {
-        if (err instanceof ApiError && err.isConflict) continue;
-        break;
-      }
-    }
-  }
-
-  async function doNewDir(parentPath = "/") {
-    if (parentPath !== "/") await ensureExpanded(parentPath);
-    const dir = parentPath === "/" ? "" : parentPath.replace(/\/$/, "");
-    for (let i = 0; i <= 9; i++) {
-      const name = i === 0 ? "new-folder" : `new-folder-${i + 1}`;
-      const path = `${dir}/${name}`;
-      try {
-        await createDir(path);
-        await refreshDir(parentPath);
-        setEditingPath(`${path}/`);
-        setEditValue(name);
-        return;
-      } catch (err) {
-        if (err instanceof ApiError && err.isConflict) continue;
-        break;
-      }
-    }
-  }
-
-  async function doDelete(path: string) {
-    const parent = parentDir(path);
-    try {
-      await deleteEntry(path);
-      if (path.endsWith("/")) collapseDir(path);
-      await refreshDir(parent);
-      // Close active file if it was deleted.
-      if (activePath && (activePath === path || activePath.startsWith(path))) {
-        closeFile();
-      }
-    } catch {
-      // TODO: surface via notification system
     }
   }
 
@@ -163,13 +115,10 @@ export function useFileTreeOperations(): FileTreeOps {
     editingPath,
     editValue,
     editInputRef,
+    setEditValue,
     startEdit,
     commitEdit,
     cancelEdit,
-    setEditValue,
-    newFile: doNewFile,
-    newDir: doNewDir,
-    deleteEntry: doDelete,
     moveEntry: doMove,
   };
 }

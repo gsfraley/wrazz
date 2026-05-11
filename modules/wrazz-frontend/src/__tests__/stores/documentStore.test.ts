@@ -17,6 +17,7 @@ vi.mock("@/stores/treeStore", () => ({
   useTreeStore: {
     getState: () => ({
       refreshDir: vi.fn().mockResolvedValue(undefined),
+      revealPath: vi.fn().mockResolvedValue(undefined),
     }),
   },
 }));

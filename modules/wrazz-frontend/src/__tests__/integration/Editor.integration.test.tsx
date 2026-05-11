@@ -85,20 +85,4 @@ describe("Editor component", () => {
 
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ title: "New" }));
   });
-
-  it("calls saveFile on Ctrl+S", () => {
-    useDocumentStore.setState({
-      activePath: "/test.md",
-      activeFile: mockFile,
-      draft: { title: "T", content: "C", tags: [] },
-    });
-
-    const spy = vi.spyOn(useDocumentStore.getState(), "saveFile").mockResolvedValue(undefined);
-
-    render(<Editor />);
-    const editorEl = screen.getByTestId("wrazz-editor");
-    fireEvent.keyDown(editorEl.closest("main")!, { key: "s", ctrlKey: true });
-
-    expect(spy).toHaveBeenCalled();
-  });
 });

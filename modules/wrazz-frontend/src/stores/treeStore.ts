@@ -12,6 +12,7 @@ interface TreeState {
   ensureExpanded: (dirPath: string) => Promise<void>;
   toggleDir: (dirPath: string) => Promise<void>;
   collapseDir: (dirPath: string) => void;
+  revealPath: (filePath: string) => Promise<void>;
 }
 
 export const useTreeStore = create<TreeState>((set, get) => ({
@@ -72,5 +73,17 @@ export const useTreeStore = create<TreeState>((set, get) => ({
       nextCh.delete(dirPath);
       return { expanded: nextExp, children: nextCh };
     });
+  },
+
+  revealPath: async (filePath) => {
+    const parts = filePath.split("/").filter(Boolean);
+    parts.pop(); // drop the filename, keep dir segments
+    const ancestors: string[] = [];
+    for (let i = 1; i <= parts.length; i++) {
+      ancestors.push("/" + parts.slice(0, i).join("/") + "/");
+    }
+    for (const dir of ancestors) {
+      await get().ensureExpanded(dir);
+    }
   },
 }));

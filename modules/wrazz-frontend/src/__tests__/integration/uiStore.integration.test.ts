@@ -45,8 +45,8 @@ describe("UIStore integration", () => {
     useUIStore.getState().setActiveCtx("editor");
     expect(useUIStore.getState().activeCtx).toBe("editor");
 
-    useUIStore.getState().setActiveCtx("file-tree");
-    expect(useUIStore.getState().activeCtx).toBe("file-tree");
+    useUIStore.getState().setActiveCtx("fileTree");
+    expect(useUIStore.getState().activeCtx).toBe("fileTree");
 
     useUIStore.getState().setActiveCtx(null);
     expect(useUIStore.getState().activeCtx).toBeNull();

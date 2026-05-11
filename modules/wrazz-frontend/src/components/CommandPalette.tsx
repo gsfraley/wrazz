@@ -1,9 +1,11 @@
+import type { Hook } from "@/lib/plugin";
 import { cx } from "@/lib/utils";
-import type { Action } from "@/lib/actions";
 import styles from "@/components/CommandBar.module.css";
 
+type CommandHook = Extract<Hook, { type: "command" }>;
+
 export type PaletteItem =
-  | { kind: "action"; action: Action }
+  | { kind: "command"; hook: CommandHook; shortcut?: string }
   | { kind: "file"; path: string; displayLabel: string };
 
 export interface Section {
@@ -57,17 +59,17 @@ export default function CommandPalette({
               {section.items.map((item) => {
                 const idx = itemIndex.get(item) ?? 0;
                 const isSel = idx === selected;
-                if (item.kind === "action") {
+                if (item.kind === "command") {
                   return (
                     <button
-                      key={item.action.id}
+                      key={item.hook.label}
                       className={cx(styles.paletteResult, isSel && styles.isSelected)}
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => onRunItem(item)}
                       onMouseEnter={() => onSetSelected(idx)}
                     >
-                      {item.action.icon && <item.action.icon size={14} />}
-                      <span className={styles.paletteResultLabel}>{item.action.label}</span>
+                      {item.hook.icon && <item.hook.icon size={14} />}
+                      <span className={styles.paletteResultLabel}>{item.hook.label}</span>
                     </button>
                   );
                 }

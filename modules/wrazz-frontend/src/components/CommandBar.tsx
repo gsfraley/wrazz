@@ -1,17 +1,22 @@
 import { useRef, useState, useEffect, useMemo } from "react";
-import type { CurrentUser } from "@/api/auth";
-import { listAllFilePaths } from "@/api/files";
+import { listAllFiles } from "@/api/files";
+import type { FileSummary } from "@/api/files";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUIStore } from "@/stores/uiStore";
-import { getActions } from "@/lib/actions";
+import { hooksForPalette } from "@/lib/pluginRegistry";
+import { buildContext } from "@/lib/buildContext";
+import { triggerDownload } from "@/lib/triggerDownload";
 import { pathToDisplayTitle, cx } from "@/lib/utils";
+import type { Hook } from "@/lib/plugin";
 import type { ContextMenuItem } from "@/components/ContextMenu";
-import { Search } from "@/icons";
+import { Save, RotateCcw, Download, Search } from "@/icons";
 import ProfileModal from "@/components/modals/ProfileModal";
 import AdminModal from "@/components/modals/AdminModal";
 import CommandPalette from "@/components/CommandPalette";
 import type { PaletteItem, Section, DropdownPos } from "@/components/CommandPalette";
 import styles from "@/components/CommandBar.module.css";
+
+type CommandHook = Extract<Hook, { type: "command" }>;
 
 function fuzzyMatch(haystack: string, needle: string): boolean {
   if (!needle) return true;
@@ -26,96 +31,81 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
   return true;
 }
 
-type Modal = "profile" | "admin" | null;
-
-export interface CommandBarProps {
-  user: CurrentUser;
-  onLogout: () => void;
-  onUserUpdated: (user: CurrentUser) => void;
-}
-
-export default function CommandBar({ user, onLogout, onUserUpdated }: CommandBarProps) {
+export default function CommandBar() {
   const inputRef = useRef<HTMLInputElement>(null);
   const inputWrapRef = useRef<HTMLDivElement>(null);
-  const commandBarRef = useRef<HTMLDivElement>(null);
-  const [modal, setModal] = useState<Modal>(null);
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
-  const [allFiles, setAllFiles] = useState<string[]>([]);
+  const [allFiles, setAllFiles] = useState<FileSummary[]>([]);
   const [dropdownPos, setDropdownPos] = useState<DropdownPos | null>(null);
 
-  const { activeCtx, openCtxMenu } = useUIStore();
+  const { user, activeModal, openModal, closeModal, openCtxMenu, paletteOpen: open, setPaletteOpen } = useUIStore();
   const { activePath, isDirty, draft, activeFile } = useDocumentStore();
   const hasActiveFile = activeFile !== null;
   const editorTitle = draft?.title || (activePath ? pathToDisplayTitle(activePath) : null);
 
+  // Side effects when the palette opens (whether triggered locally or via keyboard hook).
   useEffect(() => {
-    listAllFilePaths("/").then(setAllFiles).catch(() => {});
-  }, []);
-
-  function openPalette() {
-    if (commandBarRef.current && inputWrapRef.current) {
+    if (!open) return;
+    if (inputWrapRef.current) {
       const wrapRect = inputWrapRef.current.getBoundingClientRect();
       setDropdownPos({ top: wrapRect.bottom, left: wrapRect.left, width: wrapRect.width });
     }
-    listAllFilePaths("/").then(setAllFiles).catch(() => {});
-    setOpen(true);
+    listAllFiles("/").then(setAllFiles).catch(() => {});
     setQuery("");
     setSelected(0);
     setTimeout(() => inputRef.current?.focus(), 0);
-  }
+  }, [open]);
+
+  function openPalette() { setPaletteOpen(true); }
 
   function closePalette() {
-    setOpen(false);
+    setPaletteOpen(false);
     setQuery("");
     setSelected(0);
     inputRef.current?.blur();
   }
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "p") {
-        e.preventDefault();
-        if (open) closePalette();
-        else openPalette();
-      }
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open]);
-
   const sections = useMemo((): Section[] => {
     if (!open) return [];
-    const actions = getActions();
+    const ctx = buildContext();
+    if (!ctx) return [];
+    const commands = hooksForPalette(ctx);
 
     if (!query) {
-      const editorActions = hasActiveFile ? actions.filter((a) => a.contexts?.includes("editor")) : [];
-      const otherActions = actions.filter((a) => !a.contexts?.includes("editor"));
-      const result: Section[] = [];
-      if (editorActions.length > 0) result.push({ label: null, items: editorActions.map((a) => ({ kind: "action" as const, action: a })) });
-      if (otherActions.length > 0) result.push({ label: null, items: otherActions.map((a) => ({ kind: "action" as const, action: a })) });
-      return result;
+      const visible = commands.filter((h) => h.defaultVisible !== false);
+      if (visible.length === 0) return [];
+      const byGroup = new Map<string, CommandHook[]>();
+      for (const h of visible) {
+        const g = h.group ?? "";
+        if (!byGroup.has(g)) byGroup.set(g, []);
+        byGroup.get(g)!.push(h);
+      }
+      return [...byGroup.entries()].map(([label, hooks]) => ({
+        label: label || null,
+        items: hooks.map((h) => ({ kind: "command" as const, hook: h })),
+      }));
     }
 
-    const matchAction = (a: ReturnType<typeof getActions>[number]) =>
-      fuzzyMatch(a.label, query) || a.keywords?.some((k) => fuzzyMatch(k, query));
-    const matched = [...actions].filter(matchAction);
-    const ctxActions = matched.filter((a) => activeCtx && a.contexts?.includes(activeCtx));
-    const otherActions = matched.filter((a) => !activeCtx || !a.contexts?.includes(activeCtx));
+    const matchHook = (h: CommandHook) =>
+      fuzzyMatch(h.label, query) || h.keywords?.some((k) => fuzzyMatch(k, query)) === true;
+    const matched = commands.filter(matchHook);
     const matchedFiles = allFiles
-      .filter((p) => fuzzyMatch(p, query) || fuzzyMatch(pathToDisplayTitle(p), query))
+      .filter((f) => {
+        const displayTitle = f.title ?? pathToDisplayTitle(f.path);
+        return fuzzyMatch(f.path, query) || fuzzyMatch(displayTitle, query);
+      })
       .slice(0, 8);
 
     const result: Section[] = [];
-    if (ctxActions.length + otherActions.length > 0) {
-      result.push({ label: "Actions", items: [...ctxActions, ...otherActions].map((a) => ({ kind: "action" as const, action: a })) });
+    if (matched.length > 0) {
+      result.push({ label: "Actions", items: matched.map((h) => ({ kind: "command" as const, hook: h })) });
     }
     if (matchedFiles.length > 0) {
-      result.push({ label: "Files", items: matchedFiles.map((p) => ({ kind: "file" as const, path: p, displayLabel: pathToDisplayTitle(p) })) });
+      result.push({ label: "Files", items: matchedFiles.map((f) => ({ kind: "file" as const, path: f.path, displayLabel: f.title ?? pathToDisplayTitle(f.path) })) });
     }
     return result;
-  }, [open, query, activeCtx, allFiles, hasActiveFile]);
+  }, [open, query, allFiles]);
 
   const flatItems = useMemo(() => sections.flatMap((s) => s.items), [sections]);
   useEffect(() => { setSelected(0); }, [flatItems]);
@@ -133,27 +123,36 @@ export default function CommandBar({ user, onLogout, onUserUpdated }: CommandBar
   }
 
   function runItem(item: PaletteItem) {
-    if (item.kind === "action") { item.action.handler(); closePalette(); }
-    else { void useDocumentStore.getState().openFile(item.path); closePalette(); }
+    if (item.kind === "command") {
+      const ctx = buildContext();
+      if (ctx) void item.hook.run(ctx);
+    } else {
+      void useDocumentStore.getState().openFile(item.path);
+    }
+    closePalette();
   }
 
   function userMenuItems(): ContextMenuItem[] {
     return [
-      { type: "item", label: "Profile", onClick: () => setModal("profile") },
-      ...(user.is_admin ? [{ type: "item" as const, label: "Administration", onClick: () => setModal("admin") }] : []),
+      { type: "item", label: "Edit profile", onClick: () => openModal("profile") },
+      ...(user?.is_admin ? [{ type: "item" as const, label: "Administration", onClick: () => openModal("admin") }] : []),
       { type: "separator" },
-      { type: "item", label: "Sign out", onClick: onLogout },
+      { type: "item", label: "Sign out", onClick: () => { void useUIStore.getState().performLogout(); } },
     ];
   }
 
-  const contextChips = !hasActiveFile ? [] :
-    getActions()
-      .filter((a) => a.contexts?.includes("editor") && (a.id !== "core:discard" || isDirty))
-      .slice(0, 4);
+  type Chip = { id: string; label: string; icon: React.ComponentType<{ size?: number }>; run: () => void };
+  const contextChips: Chip[] = !hasActiveFile ? [] : [
+    { id: "save", label: "Save", icon: Save, run: () => { void useDocumentStore.getState().saveFile(); } },
+    ...(isDirty ? [{ id: "discard", label: "Discard", icon: RotateCcw, run: () => { void useDocumentStore.getState().discardChanges(); } }] : []),
+    { id: "export", label: "Export", icon: Download, run: () => {
+      if (activePath) triggerDownload(`/api/export/file/${activePath.replace(/^\/|\/$/g, "")}`);
+    } },
+  ];
 
   return (
     <>
-      <div className={cx(styles.commandBar, open && styles.isOpen)} ref={commandBarRef}>
+      <div className={cx(styles.commandBar, open && styles.isOpen)}>
         <div className={cx(styles.commandInputWrap, open && styles.isOpen)} ref={inputWrapRef}>
           <Search size={14} className={styles.commandInputSearchIcon} />
           <input
@@ -169,10 +168,15 @@ export default function CommandBar({ user, onLogout, onUserUpdated }: CommandBar
           />
           {!open && contextChips.length > 0 && (
             <div className={styles.commandChips}>
-              {contextChips.map((a) => (
-                <button key={a.id} className={styles.commandChip} onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); a.handler(); }} title={a.label}>
-                  {a.icon && <a.icon size={12} />}
-                  <span>{a.label}</span>
+              {contextChips.map((chip) => (
+                <button
+                  key={chip.id}
+                  className={styles.commandChip}
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); chip.run(); }}
+                  title={chip.label}
+                >
+                  <chip.icon size={12} />
+                  <span>{chip.label}</span>
                 </button>
               ))}
             </div>
@@ -183,7 +187,7 @@ export default function CommandBar({ user, onLogout, onUserUpdated }: CommandBar
             className={styles.userMenuTrigger}
             onClick={(e) => openCtxMenu(e, userMenuItems(), "top-to-element-bottom", "right-to-element-right")}
           >
-            {user.display_name}
+            {user?.display_name}
           </button>
         </div>
       </div>
@@ -200,8 +204,8 @@ export default function CommandBar({ user, onLogout, onUserUpdated }: CommandBar
         />
       )}
 
-      {modal === "profile" && <ProfileModal user={user} onClose={() => setModal(null)} onUpdated={onUserUpdated} />}
-      {modal === "admin" && <AdminModal onClose={() => setModal(null)} currentUserId={user.id} />}
+      {activeModal === "profile" && <ProfileModal onClose={closeModal} />}
+      {activeModal === "admin" && <AdminModal onClose={closeModal} />}
     </>
   );
 }

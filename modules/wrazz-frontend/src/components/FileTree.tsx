@@ -1,4 +1,4 @@
-import { useState, forwardRef, useImperativeHandle } from "react";
+import { useState, useEffect } from "react";
 import { useTreeStore } from "@/stores/treeStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useDraftStore } from "@/stores/draftStore";
@@ -8,20 +8,11 @@ import FileRow from "@/components/tree/FileRow";
 import DirRow from "@/components/tree/DirRow";
 import { Menu } from "@/icons";
 import { cx } from "@/lib/utils";
-import { triggerDownload } from "@/lib/triggerDownload";
+import { buildContext, buildTargetForPath } from "@/lib/buildContext";
+import { hooksForContextMenu, contextMenuItems } from "@/lib/pluginRegistry";
 import type { Entry } from "@/api/files";
-import type { ContextMenuItem } from "@/components/ContextMenu";
-import ConfirmModal from "@/components/modals/ConfirmModal";
+import type { DirEntry, RootEntry } from "@/lib/plugin";
 import styles from "@/components/FileTree.module.css";
-
-function pathToUrl(path: string): string {
-  return path.replace(/^\/|\/$/g, "");
-}
-
-function entryName(path: string): string {
-  const clean = path.endsWith("/") ? path.slice(0, -1) : path;
-  return clean.split("/").pop() ?? path;
-}
 
 function sortedEntries(entries: Entry[]): Entry[] {
   return [...entries].sort((a, b) => {
@@ -30,16 +21,16 @@ function sortedEntries(entries: Entry[]): Entry[] {
   });
 }
 
-export interface FileTreeHandle {
-  newFile: (parentPath?: string) => void;
-  newDir: (parentPath?: string) => void;
+function entryName(path: string): string {
+  const clean = path.endsWith("/") ? path.slice(0, -1) : path;
+  return clean.split("/").pop() ?? path;
 }
 
 export interface FileTreeProps {
   width: number;
 }
 
-const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree({ width }, ref) {
+export default function FileTree({ width }: FileTreeProps) {
   const { root, expanded, children, toggleDir } = useTreeStore();
   const { activePath } = useDocumentStore();
   const { draftPaths } = useDraftStore();
@@ -48,48 +39,44 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree({ w
   const ops = useFileTreeOperations();
   const [dragPath, setDragPath] = useState<string | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
-  const [confirmPath, setConfirmPath] = useState<string | null>(null);
 
-  useImperativeHandle(ref, () => ({
-    newFile: (parentPath = "/") => { void ops.newFile(parentPath); },
-    newDir: (parentPath = "/") => { void ops.newDir(parentPath); },
-  }));
+  // Scroll the active file into view whenever it changes or a directory expands to reveal it.
+  useEffect(() => {
+    if (!activePath) return;
+    const el = document.querySelector(`[data-tree-path="${activePath}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [activePath, expanded]);
 
-  function fileCtxItems(path: string): ContextMenuItem[] {
-    return [
-      { type: "item", label: "Rename", onClick: () => ops.startEdit(path) },
-      { type: "separator" },
-      { type: "item", label: "Export", onClick: () => triggerDownload(`/api/export/file/${pathToUrl(path)}`) },
-      { type: "item", label: "Delete", danger: true, onClick: () => ops.deleteEntry(path) },
-    ];
+  function openMenuForPath(e: React.MouseEvent, path: string) {
+    const ctx = buildContext();
+    if (!ctx) return;
+    const target = buildTargetForPath(path);
+    const hooks = hooksForContextMenu(ctx, target);
+    const items = contextMenuItems(ctx, target, hooks);
+    if (items.length > 0) openCtxMenu(e, items);
   }
 
-  function dirCtxItems(path: string): ContextMenuItem[] {
-    return [
-      { type: "item", label: "New file", onClick: () => ops.newFile(path) },
-      { type: "item", label: "New folder", onClick: () => ops.newDir(path) },
-      { type: "separator" },
-      { type: "item", label: "Rename", onClick: () => ops.startEdit(path) },
-      { type: "separator" },
-      { type: "item", label: "Export as zip", onClick: () => triggerDownload(`/api/export/dir/${pathToUrl(path)}`) },
-      { type: "item", label: "Delete", danger: true, onClick: () => ops.deleteEntry(path) },
-    ];
+  async function handleDelete(path: string) {
+    const ctx = buildContext();
+    if (!ctx) return;
+    const ok = await ctx.confirm(`Delete "${entryName(path)}"?`);
+    if (!ok) return;
+    const target = buildTargetForPath(path);
+    if (target.kind === "file" || target.kind === "dir") await target.delete();
   }
 
-  function backgroundCtxItems(): ContextMenuItem[] {
-    return [
-      { type: "item", label: "New file", onClick: () => ops.newFile("/") },
-      { type: "item", label: "New folder", onClick: () => ops.newDir("/") },
-    ];
+  async function handleNewFile(dirPath: string) {
+    const target = buildTargetForPath(dirPath);
+    if (target.kind === "dir" || target.kind === "root") {
+      await (target as DirEntry | RootEntry).newFile();
+    }
   }
 
-  function workspaceCtxItems(): ContextMenuItem[] {
-    return [
-      { type: "item", label: "New file", onClick: () => ops.newFile("/") },
-      { type: "item", label: "New folder", onClick: () => ops.newDir("/") },
-      { type: "separator" },
-      { type: "item", label: "Export workspace", onClick: () => triggerDownload("/api/export/dir/") },
-    ];
+  async function handleNewDir(dirPath: string) {
+    const target = buildTargetForPath(dirPath);
+    if (target.kind === "dir" || target.kind === "root") {
+      await (target as DirEntry | RootEntry).newDir();
+    }
   }
 
   function renderEntries(entries: Entry[], depth: number): React.ReactNode {
@@ -117,9 +104,9 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree({ w
               onCommitEdit={() => { void ops.commitEdit(); }}
               onCancelEdit={ops.cancelEdit}
               onEditValueChange={ops.setEditValue}
-              onNewFile={() => { void ops.newFile(entry.path); }}
-              onNewDir={() => { void ops.newDir(entry.path); }}
-              onDeleteConfirm={() => setConfirmPath(entry.path)}
+              onNewFile={() => { void handleNewFile(entry.path); }}
+              onNewDir={() => { void handleNewDir(entry.path); }}
+              onDeleteConfirm={() => { void handleDelete(entry.path); }}
               onDragStart={(e) => { e.stopPropagation(); setDragPath(entry.path); }}
               onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverPath(entry.path); }}
               onDragLeave={(e) => { e.stopPropagation(); setDragOverPath(null); }}
@@ -131,7 +118,7 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree({ w
                 setDragOverPath(null);
               }}
               onDragEnd={() => { setDragPath(null); setDragOverPath(null); }}
-              onContextMenu={(e) => openCtxMenu(e, dirCtxItems(entry.path))}
+              onContextMenu={(e) => openMenuForPath(e, entry.path)}
             />
             {isOpen && renderEntries(children.get(entry.path) ?? [], depth + 1)}
           </div>
@@ -154,23 +141,23 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree({ w
           onCommitEdit={() => { void ops.commitEdit(); }}
           onCancelEdit={ops.cancelEdit}
           onEditValueChange={ops.setEditValue}
-          onDeleteConfirm={() => setConfirmPath(entry.path)}
+          onDeleteConfirm={() => { void handleDelete(entry.path); }}
           onDragStart={(e) => { e.stopPropagation(); setDragPath(entry.path); }}
           onDragEnd={() => { setDragPath(null); setDragOverPath(null); }}
-          onContextMenu={(e) => openCtxMenu(e, fileCtxItems(entry.path))}
+          onContextMenu={(e) => openMenuForPath(e, entry.path)}
         />
       );
     });
   }
 
   return (
-    <aside className={styles.sidebar} style={{ width }} onClick={() => setActiveCtx("file-tree")}>
+    <aside className={styles.sidebar} style={{ width }} onClick={() => setActiveCtx("fileTree")}>
       <div className={styles.sidebarHeader}>
         <span className={styles.sidebarHeading}>Workspace</span>
         <div className={styles.sidebarMenu}>
           <button
             className={styles.sidebarMenuBtn}
-            onClick={(e) => openCtxMenu(e, workspaceCtxItems(), "top-to-element-bottom", "left-to-element-left")}
+            onClick={(e) => openMenuForPath(e, "/")}
             aria-label="Workspace menu"
           >
             <Menu size={14} />
@@ -181,7 +168,7 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree({ w
         className={styles.tree}
         onContextMenu={(e) => {
           if ((e.target as HTMLElement).closest(`.${styles.treeRow}`)) return;
-          openCtxMenu(e, backgroundCtxItems());
+          openMenuForPath(e, "/");
         }}
       >
         {renderEntries(root, 0)}
@@ -202,15 +189,6 @@ const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(function FileTree({ w
           </div>
         )}
       </div>
-      {confirmPath && (
-        <ConfirmModal
-          message={`Delete "${entryName(confirmPath)}"?`}
-          onConfirm={() => { void ops.deleteEntry(confirmPath); }}
-          onClose={() => setConfirmPath(null)}
-        />
-      )}
     </aside>
   );
-});
-
-export default FileTree;
+}

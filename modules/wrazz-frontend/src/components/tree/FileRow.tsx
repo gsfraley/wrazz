@@ -56,6 +56,7 @@ const FileRow = memo(function FileRow({
         isDragOver && styles.dragOver,
       )}
       style={{ paddingLeft: indent }}
+      data-tree-path={path}
       onClick={() => !isEditing && onOpen()}
       onDoubleClick={() => onStartEdit()}
       onContextMenu={(e) => !isEditing && onContextMenu(e)}

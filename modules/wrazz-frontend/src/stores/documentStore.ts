@@ -63,6 +63,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           status: null,
         });
       }
+      void useTreeStore.getState().revealPath(path);
     } catch {
       set({ status: { kind: "error", message: "Could not load file." } });
     }
