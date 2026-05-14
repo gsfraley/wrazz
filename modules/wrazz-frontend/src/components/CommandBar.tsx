@@ -10,9 +10,11 @@ import { triggerDownload } from "@/lib/triggerDownload";
 import { pathToDisplayTitle, cx } from "@/lib/utils";
 import type { Hook } from "@/lib/plugin";
 import type { ContextMenuItem } from "@/components/ContextMenu";
-import { Save, RotateCcw, Download, Search } from "@/icons";
+import { Save, RotateCcw, Download, Search, Settings } from "@/icons";
+import { isDesktop } from "@/lib/api";
 import ProfileModal from "@/components/modals/ProfileModal";
 import AdminModal from "@/components/modals/AdminModal";
+import DesktopSettingsModal from "@/components/modals/DesktopSettingsModal";
 import CommandPalette from "@/components/CommandPalette";
 import type { PaletteItem, Section, DropdownPos } from "@/components/CommandPalette";
 import styles from "@/components/CommandBar.module.css";
@@ -187,12 +189,22 @@ export default function CommandBar() {
           )}
         </div>
         <div className={styles.userMenu}>
-          <button
-            className={styles.userMenuTrigger}
-            onClick={(e) => openCtxMenu(e, userMenuItems(), "top-to-element-bottom", "right-to-element-right")}
-          >
-            {user?.display_name}
-          </button>
+          {isDesktop() ? (
+            <button
+              className={styles.userMenuTrigger}
+              onClick={() => openModal("desktop-settings")}
+              title="Workspace settings"
+            >
+              <Settings size={14} />
+            </button>
+          ) : (
+            <button
+              className={styles.userMenuTrigger}
+              onClick={(e) => openCtxMenu(e, userMenuItems(), "top-to-element-bottom", "right-to-element-right")}
+            >
+              {user?.display_name}
+            </button>
+          )}
         </div>
       </div>
 
@@ -210,6 +222,7 @@ export default function CommandBar() {
 
       {activeModal === "profile" && <ProfileModal onClose={closeModal} />}
       {activeModal === "admin" && <AdminModal onClose={closeModal} />}
+      {activeModal === "desktop-settings" && <DesktopSettingsModal onClose={closeModal} />}
     </>
   );
 }

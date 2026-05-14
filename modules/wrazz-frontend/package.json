@@ -12,6 +12,7 @@
     "test:coverage": "vitest --config vitest.config.ts --coverage"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zustand": "^5.0.13"

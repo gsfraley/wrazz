@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getCurrentUser } from "@/api/auth";
+import { isDesktop } from "@/lib/api";
 import { useDraftStore } from "@/stores/draftStore";
 import { useTreeStore } from "@/stores/treeStore";
 import { useUIStore } from "@/stores/uiStore";
@@ -11,6 +12,7 @@ import StatusBar from "@/components/StatusBar";
 import LoginPage from "@/components/LoginPage";
 import ContextMenu from "@/components/ContextMenu";
 import ConfirmModal from "@/components/modals/ConfirmModal";
+import DesktopSettingsModal from "@/components/modals/DesktopSettingsModal";
 import { registerPlugin } from "@/lib/pluginRegistry";
 import { hooksForKeyboard } from "@/lib/pluginRegistry";
 import { buildContext } from "@/lib/buildContext";
@@ -44,6 +46,17 @@ export default function App() {
   const dragState = useRef<{ startX: number; startWidth: number } | null>(null);
 
   useEffect(() => {
+    if (isDesktop()) {
+      // Desktop mode: no server-side auth. Use a synthetic local user.
+      setUser({ id: "__desktop__", display_name: "Desktop", is_admin: false, created_at: new Date().toISOString(), email: null });
+      useWorkspaceStore.getState().load().then(() => {
+        void useTreeStore.getState().reload();
+        void useDraftStore.getState().initializeDraftPaths();
+      });
+      setAuthChecked(true);
+      return;
+    }
+
     getCurrentUser()
       .then(async (u) => {
         setUser(u);
@@ -100,7 +113,7 @@ export default function App() {
   }, [sidebarWidth, setSidebarWidth]);
 
   if (!authChecked) return null;
-  if (!user) {
+  if (!user && !isDesktop()) {
     return (
       <LoginPage
         onLogin={async (u) => {

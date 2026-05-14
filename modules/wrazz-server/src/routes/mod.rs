@@ -5,9 +5,15 @@
 //! - `POST /api/auth/login`, `POST /api/auth/logout`
 //! - `GET  /api/auth/oidc/redirect`, `GET /api/auth/oidc/callback`, `GET /api/auth/oidc/status`
 //!
-//! Authenticated routes (require valid session cookie):
+//! Authenticated routes (require valid session cookie or Bearer token):
 //! - User: `POST/GET/PUT /api/user`, `GET /api/user/{handle}`
 //! - Admin: `GET/PUT/DELETE /api/admin/oidc`, `GET /api/admin/users`, `DELETE /api/admin/users/{id}`
+//!
+//! Token management (session cookie required):
+//! - `GET    /api/connect`      — connect approval page
+//! - `POST   /api/connect`      — issue token after approval
+//! - `GET    /api/tokens`       — list tokens
+//! - `DELETE /api/tokens/{id}`  — delete a token
 //!
 //! Workspace CRUD (authenticated):
 //! - `GET    /api/workspaces`
@@ -34,6 +40,7 @@ pub mod auth;
 pub mod export;
 pub mod files;
 pub mod oidc;
+pub mod tokens;
 pub mod user;
 pub mod version;
 pub mod workspaces;
@@ -65,6 +72,12 @@ pub fn router(state: AppState, static_dir: Option<String>) -> Router {
         .route("/admin/users", get(admin::list_users))
         .route("/admin/users/{id}", delete(admin::delete_user));
 
+    let token_routes = Router::new()
+        .route("/connect",
+            get(tokens::connect_approval_page).post(tokens::connect_submit))
+        .route("/tokens", get(tokens::list_tokens))
+        .route("/tokens/{id}", delete(tokens::delete_token));
+
     // Per-workspace file/export operations, nested under /{workspace_id}/.
     let workspace_ops = Router::new()
         .route("/entries", get(files::list_entries))
@@ -90,6 +103,7 @@ pub fn router(state: AppState, static_dir: Option<String>) -> Router {
         .nest("/auth", auth_routes)
         .merge(user_routes)
         .merge(admin_routes)
+        .merge(token_routes)
         .merge(workspace_routes);
 
     let base = Router::new()

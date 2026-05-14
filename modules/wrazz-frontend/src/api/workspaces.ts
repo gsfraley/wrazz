@@ -3,6 +3,12 @@ import { apiFetch } from "@/lib/apiError";
 export interface WorkspaceSummary {
   id: string;
   name: string;
+  /** Present in desktop mode only. */
+  kind?: "local" | "remote";
+  /** Local workspaces: the filesystem path. */
+  path?: string;
+  /** Remote workspaces: the wrazz-server base URL. */
+  server_url?: string;
 }
 
 export async function listWorkspaces(): Promise<WorkspaceSummary[]> {

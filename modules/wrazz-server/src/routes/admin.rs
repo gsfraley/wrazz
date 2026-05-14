@@ -207,7 +207,7 @@ pub async fn delete_user(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     require_admin(&auth_user)?;
-    if auth_user.0.id == id {
+    if auth_user.user.id == id {
         return Err((StatusCode::BAD_REQUEST, "cannot delete your own account".into()));
     }
     db::delete_user(&state.pool, id).await
@@ -218,7 +218,7 @@ pub async fn delete_user(
 // --- Helpers ---
 
 fn require_admin(auth_user: &AuthUser) -> Result<(), (StatusCode, String)> {
-    if auth_user.0.is_admin {
+    if auth_user.user.is_admin {
         Ok(())
     } else {
         Err((StatusCode::FORBIDDEN, "admin required".into()))

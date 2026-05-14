@@ -20,6 +20,7 @@
 pub mod http_backend;
 pub mod local_workspace;
 pub mod registry_backend;
+pub mod remote_workspace;
 pub mod routes;
 pub mod store;
 pub mod workspace_registry;
@@ -27,6 +28,7 @@ pub mod workspace_registry;
 pub use http_backend::HttpBackend;
 pub use local_workspace::LocalWorkspace;
 pub use registry_backend::RegistryBackend;
+pub use remote_workspace::{RemoteWorkspace, RemoteWorkspaceConfig};
 pub use store::{Store, StoreError, slugify};
 pub use workspace_registry::WorkspaceRegistry;
 

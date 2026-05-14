@@ -40,5 +40,5 @@ export async function login(
 
 /// POSTs to /api/auth/logout. Always resolves (even if session was absent).
 export async function logout(): Promise<void> {
-  await fetch("/api/auth/logout", { method: "POST" });
+  await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => {});
 }

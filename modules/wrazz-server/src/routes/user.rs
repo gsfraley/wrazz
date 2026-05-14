@@ -43,7 +43,7 @@ pub async fn create_user(
     auth_user: AuthUser,
     Json(req): Json<CreateUserRequest>,
 ) -> Result<(StatusCode, Json<User>), (StatusCode, String)> {
-    if !auth_user.0.is_admin {
+    if !auth_user.user.is_admin {
         return Err((StatusCode::FORBIDDEN, "admin required".into()));
     }
 
@@ -75,7 +75,7 @@ pub async fn create_user(
 
 /// `GET /api/user/self` — return the authenticated caller's own user record.
 pub async fn get_user_self(auth_user: AuthUser) -> Json<User> {
-    Json(auth_user.0)
+    Json(auth_user.user)
 }
 
 /// `PUT /api/user/self` — update the caller's email address.
@@ -86,7 +86,7 @@ pub async fn update_user_self(
     auth_user: AuthUser,
     Json(req): Json<UpdateSelfRequest>,
 ) -> Result<Json<User>, (StatusCode, String)> {
-    db::set_user_email(&state.pool, auth_user.0.id, req.email.as_deref())
+    db::set_user_email(&state.pool, auth_user.user.id, req.email.as_deref())
         .await
         .map_err(|e| {
             if let sqlx::Error::Database(ref dbe) = e {
@@ -97,7 +97,7 @@ pub async fn update_user_self(
             (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
         })?;
 
-    let user = db::get_user_by_id(&state.pool, auth_user.0.id)
+    let user = db::get_user_by_id(&state.pool, auth_user.user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "user not found".into()))?;
@@ -116,8 +116,8 @@ pub async fn get_user_by_handle(
 ) -> Result<Json<User>, (StatusCode, String)> {
     let target_id = parse_handle(&handle)?;
 
-    let is_self = auth_user.0.id == target_id;
-    let is_admin = auth_user.0.is_admin;
+    let is_self = auth_user.user.id == target_id;
+    let is_admin = auth_user.user.is_admin;
     if !is_self && !is_admin {
         return Err((StatusCode::FORBIDDEN, "access denied".into()));
     }
