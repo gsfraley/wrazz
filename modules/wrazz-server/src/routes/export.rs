@@ -47,7 +47,7 @@ impl From<std::io::Error> for ApiError {
 
 // --- Handlers ---
 
-pub async fn export_file(
+pub(crate) async fn export_file(
     State(state): State<AppState>,
     auth_user: AuthUser,
     Path(rel): Path<String>,
@@ -63,7 +63,7 @@ pub async fn export_file(
         .unwrap())
 }
 
-pub async fn export_dir(
+pub(crate) async fn export_dir(
     State(state): State<AppState>,
     auth_user: AuthUser,
     Path(rel): Path<String>,
@@ -71,7 +71,7 @@ pub async fn export_dir(
     build_zip_response(state, auth_user.0.id, &rel).await
 }
 
-pub async fn export_dir_root(
+pub(crate) async fn export_dir_root(
     State(state): State<AppState>,
     auth_user: AuthUser,
 ) -> Result<Response, ApiError> {
