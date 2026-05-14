@@ -21,6 +21,8 @@ build-server:
 # ── Run ───────────────────────────────────────────────────────────────────────
 
 # Run server + frontend dev in parallel
+# Dev URL: http://localhost:5173  (Vite, HMR, proxies /api → :3001)
+# API only: http://localhost:3001  (Rust, do not browse here directly)
 run:
     #!/usr/bin/env bash
     trap 'kill 0' SIGINT SIGTERM
@@ -28,10 +30,10 @@ run:
     just run-frontend &
     wait
 
-# Run the Rust server with live reload
+# Run the Rust server with live reload (API only in dev — no static files)
 run-server:
-    RUST_LOG=info WRAZZ_BOOTSTRAP_ADMIN=admin:secret WRAZZ_BIND=0.0.0.0:3001 WRAZZ_STATIC_DIR=modules/wrazz-frontend/dist cargo watch -x 'run -p wrazz-server'
+    RUST_LOG=info WRAZZ_BOOTSTRAP_ADMIN=admin:secret WRAZZ_BIND=0.0.0.0:3001 cargo watch -x 'run -p wrazz-server'
 
-# Run the frontend dev server (editor source is live via vite alias — no build-editor needed)
+# Run the Vite dev server (editor source is live via alias — no build-editor needed)
 run-frontend:
     cd modules/wrazz-frontend && yarn dev

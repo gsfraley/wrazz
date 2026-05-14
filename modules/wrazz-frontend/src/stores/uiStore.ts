@@ -9,7 +9,7 @@ import { useDocumentStore } from "@/stores/documentStore";
 
 export type { ActiveContext };
 
-const SIDEBAR_MIN = 160;
+const SIDEBAR_MIN = 200;
 const SIDEBAR_MAX = 520;
 export const SIDEBAR_DEFAULT = 240;
 

@@ -1,5 +1,6 @@
 .sidebar {
   flex-shrink: 0;
+  min-width: 200px;
   background: var(--paper-sidebar);
   display: flex;
   flex-direction: column;
@@ -8,7 +9,7 @@
 
 .sidebarHeader {
   height: 60px;
-  padding: 0 8px 0 18px;
+  padding: 0 8px 0 10px;
   background: var(--paper-topbar);
   border-bottom: 1px solid var(--border-strong);
   display: flex;
@@ -37,8 +38,9 @@
   font-family: ui-monospace, monospace;
   letter-spacing: 0.02em;
   color: var(--ink-muted);
-  padding: 3px 6px;
-  min-width: 0;
+  padding: 8px 8px 8px 15px;
+  min-width: 140px;
+  margin-right: 10px;
   flex: 1;
   overflow: hidden;
 }
@@ -67,7 +69,7 @@
 
 .wsDropdown {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% - 8px);
   left: 8px;
   right: 8px;
   background: var(--paper-topbar);

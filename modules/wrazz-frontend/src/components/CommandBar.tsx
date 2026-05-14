@@ -148,7 +148,8 @@ export default function CommandBar() {
     { id: "save", label: "Save", icon: Save, run: () => { void useDocumentStore.getState().saveFile(); } },
     ...(isDirty ? [{ id: "discard", label: "Discard", icon: RotateCcw, run: () => { void useDocumentStore.getState().discardChanges(); } }] : []),
     { id: "export", label: "Export", icon: Download, run: () => {
-      if (activePath) triggerDownload(`/api/export/file/${activePath.replace(/^\/|\/$/g, "")}`);
+      const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+      if (activePath && wsId) triggerDownload(`/api/workspaces/${wsId}/export/file/${activePath.replace(/^\/|\/$/g, "")}`);
     } },
   ];
 
