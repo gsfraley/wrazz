@@ -1,25 +1,34 @@
-/// Assembles the full Axum router.
-///
-/// Version routes (open, no auth):
-/// - `GET  /api/version`
-///
-/// Auth routes (open):
-/// - `POST /api/auth/login`, `POST /api/auth/logout`
-/// - `GET  /api/auth/oidc/redirect`, `GET /api/auth/oidc/callback`
-///
-/// User routes (authenticated / admin):
-/// - `POST /api/user` — admin only
-/// - `GET  /api/user/self`, `GET /api/user/{handle}` — authenticated
-///
-/// File and directory routes (authenticated, workspace-implicit):
-/// - `GET    /api/entries?path=<path>`  — list directory
-/// - `DELETE /api/entries/{*path}`      — delete file or directory
-/// - `POST   /api/entries/move`         — move/rename
-/// - `GET    /api/files/{*path}`        — file metadata
-/// - `GET    /api/content/{*path}`      — file content
-/// - `POST   /api/files`               — create file
-/// - `PUT    /api/files/{*path}`        — update file
-/// - `POST   /api/dirs`                — create directory
+//! Axum router assembly.
+//!
+//! Open routes:
+//! - `GET  /api/version`
+//! - `POST /api/auth/login`, `POST /api/auth/logout`
+//! - `GET  /api/auth/oidc/redirect`, `GET /api/auth/oidc/callback`, `GET /api/auth/oidc/status`
+//!
+//! Authenticated routes (require valid session cookie):
+//! - User: `POST/GET/PUT /api/user`, `GET /api/user/{handle}`
+//! - Admin: `GET/PUT/DELETE /api/admin/oidc`, `GET /api/admin/users`, `DELETE /api/admin/users/{id}`
+//!
+//! Workspace CRUD (authenticated):
+//! - `GET    /api/workspaces`
+//! - `POST   /api/workspaces`
+//! - `GET    /api/workspaces/{id}`
+//! - `PATCH  /api/workspaces/{id}`
+//! - `DELETE /api/workspaces/{id}`
+//!
+//! Workspace file routes (authenticated, workspace-scoped):
+//! - `GET    /api/workspaces/{id}/entries`
+//! - `DELETE /api/workspaces/{id}/entries/{*path}`
+//! - `PATCH  /api/workspaces/{id}/entries/{*path}`
+//! - `GET    /api/workspaces/{id}/files/{*path}`
+//! - `POST   /api/workspaces/{id}/files/{*path}`
+//! - `PUT    /api/workspaces/{id}/files/{*path}`
+//! - `GET    /api/workspaces/{id}/content/{*path}`
+//! - `POST   /api/workspaces/{id}/dirs/{*path}`
+//! - `GET    /api/workspaces/{id}/export/file/{*path}`
+//! - `GET    /api/workspaces/{id}/export/dir`
+//! - `GET    /api/workspaces/{id}/export/dir/{*path}`
+
 pub mod admin;
 pub mod auth;
 pub mod export;
@@ -27,6 +36,7 @@ pub mod files;
 pub mod oidc;
 pub mod user;
 pub mod version;
+pub mod workspaces;
 
 use axum::{
     Router,
@@ -55,34 +65,32 @@ pub fn router(state: AppState, static_dir: Option<String>) -> Router {
         .route("/admin/users", get(admin::list_users))
         .route("/admin/users/{id}", delete(admin::delete_user));
 
-    let entry_routes = Router::new()
+    // Per-workspace file/export operations, nested under /{workspace_id}/.
+    let workspace_ops = Router::new()
         .route("/entries", get(files::list_entries))
-        .route("/entries/{*path}", delete(files::delete_entry).patch(files::move_entry));
-
-    let file_routes = Router::new()
-        .route("/files/{*path}", post(files::create_file).get(files::get_file).put(files::update_file));
-
-    let content_routes = Router::new()
-        .route("/content/{*path}", get(files::get_file_content));
-
-    let dir_routes = Router::new()
-        .route("/dirs/{*path}", post(files::create_dir));
-
-    let export_routes = Router::new()
+        .route("/entries/{*path}", delete(files::delete_entry).patch(files::move_entry))
+        .route("/files/{*path}",
+            post(files::create_file).get(files::get_file).put(files::update_file))
+        .route("/content/{*path}", get(files::get_file_content))
+        .route("/dirs/{*path}", post(files::create_dir))
         .route("/export/file/{*path}", get(export::export_file))
         .route("/export/dir", get(export::export_dir_root))
         .route("/export/dir/{*path}", get(export::export_dir));
+
+    let workspace_routes = Router::new()
+        .route("/workspaces", get(workspaces::list_workspaces).post(workspaces::create_workspace))
+        .route("/workspaces/{workspace_id}",
+            get(workspaces::get_workspace)
+            .patch(workspaces::rename_workspace)
+            .delete(workspaces::delete_workspace))
+        .nest("/workspaces/{workspace_id}", workspace_ops);
 
     let api = Router::new()
         .route("/version", get(version::get_version))
         .nest("/auth", auth_routes)
         .merge(user_routes)
         .merge(admin_routes)
-        .merge(entry_routes)
-        .merge(file_routes)
-        .merge(content_routes)
-        .merge(dir_routes)
-        .merge(export_routes);
+        .merge(workspace_routes);
 
     let base = Router::new()
         .nest("/api", api)

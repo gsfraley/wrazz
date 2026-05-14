@@ -4,7 +4,12 @@ import type { FileEntry } from "@/api/files";
 import { getDraft } from "@/lib/drafts";
 import { useDraftStore } from "@/stores/draftStore";
 import { useTreeStore } from "@/stores/treeStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import type { Draft, AppStatus } from "@/types";
+
+function activeWorkspaceId(): string | null {
+  return useWorkspaceStore.getState().activeWorkspaceId;
+}
 
 interface DocumentState {
   activePath: string | null;
@@ -21,7 +26,6 @@ interface DocumentState {
   setStatus: (status: AppStatus | null) => void;
 }
 
-// Debounce timer lives outside Zustand state — no re-renders needed for the timer itself.
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
 function parentDir(path: string): string {
@@ -40,10 +44,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   status: null,
 
   openFile: async (path) => {
+    const wsId = activeWorkspaceId();
+    if (!wsId) return;
     try {
       const [file, { content }, stored] = await Promise.all([
-        getFile(path),
-        getFileContent(path),
+        getFile(wsId, path),
+        getFileContent(wsId, path),
         getDraft(path),
       ]);
       if (stored) {
@@ -71,13 +77,13 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   saveFile: async () => {
     const { activePath, draft } = get();
-    if (!activePath || !draft) return;
+    const wsId = activeWorkspaceId();
+    if (!activePath || !draft || !wsId) return;
     try {
-      const updated = await updateFile(activePath, draft.title.trim() || null, draft.tags, draft.content);
+      const updated = await updateFile(wsId, activePath, draft.title.trim() || null, draft.tags, draft.content);
       const draftStore = useDraftStore.getState();
       await draftStore.clearStoredDraft(activePath);
       set({ activeFile: updated, isDirty: false, status: { kind: "ok", message: "Saved" } });
-      // Refresh the parent directory in the tree.
       await useTreeStore.getState().refreshDir(parentDir(activePath));
     } catch {
       set({ status: { kind: "error", message: "Save failed." } });

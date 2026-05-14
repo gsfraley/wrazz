@@ -3,6 +3,7 @@ import { listAllFiles } from "@/api/files";
 import type { FileSummary } from "@/api/files";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUIStore } from "@/stores/uiStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { hooksForPalette } from "@/lib/pluginRegistry";
 import { buildContext } from "@/lib/buildContext";
 import { triggerDownload } from "@/lib/triggerDownload";
@@ -51,7 +52,8 @@ export default function CommandBar() {
       const wrapRect = inputWrapRef.current.getBoundingClientRect();
       setDropdownPos({ top: wrapRect.bottom, left: wrapRect.left, width: wrapRect.width });
     }
-    listAllFiles("/").then(setAllFiles).catch(() => {});
+    const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+    if (wsId) listAllFiles(wsId, "/").then(setAllFiles).catch(() => {});
     setQuery("");
     setSelected(0);
     setTimeout(() => inputRef.current?.focus(), 0);

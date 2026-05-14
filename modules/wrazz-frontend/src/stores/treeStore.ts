@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { listEntries } from "@/api/files";
 import type { Entry } from "@/api/files";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+
+function activeWorkspaceId(): string | null {
+  return useWorkspaceStore.getState().activeWorkspaceId;
+}
 
 interface TreeState {
   root: Entry[];
@@ -21,12 +26,14 @@ export const useTreeStore = create<TreeState>((set, get) => ({
   children: new Map(),
 
   reload: async () => {
-    const rootEntries = await listEntries("/").catch(() => []);
+    const wsId = activeWorkspaceId();
+    if (!wsId) { set({ root: [], children: new Map() }); return; }
+    const rootEntries = await listEntries(wsId, "/").catch(() => []);
     const { expanded } = get();
     const refreshed = new Map<string, Entry[]>();
     await Promise.all(
       [...expanded].map(async (p) => {
-        const entries = await listEntries(p).catch(() => []);
+        const entries = await listEntries(wsId, p).catch(() => []);
         refreshed.set(p, entries);
       }),
     );
@@ -34,7 +41,9 @@ export const useTreeStore = create<TreeState>((set, get) => ({
   },
 
   refreshDir: async (dirPath) => {
-    const entries = await listEntries(dirPath).catch(() => []);
+    const wsId = activeWorkspaceId();
+    if (!wsId) return;
+    const entries = await listEntries(wsId, dirPath).catch(() => []);
     if (dirPath === "/") {
       set({ root: entries });
     } else {
@@ -43,9 +52,11 @@ export const useTreeStore = create<TreeState>((set, get) => ({
   },
 
   ensureExpanded: async (dirPath) => {
+    const wsId = activeWorkspaceId();
+    if (!wsId) return;
     const { expanded } = get();
     if (expanded.has(dirPath)) return;
-    const entries = await listEntries(dirPath).catch(() => []);
+    const entries = await listEntries(wsId, dirPath).catch(() => []);
     set((s) => ({
       expanded: new Set([...s.expanded, dirPath]),
       children: new Map(s.children).set(dirPath, entries),
@@ -77,7 +88,7 @@ export const useTreeStore = create<TreeState>((set, get) => ({
 
   revealPath: async (filePath) => {
     const parts = filePath.split("/").filter(Boolean);
-    parts.pop(); // drop the filename, keep dir segments
+    parts.pop();
     const ancestors: string[] = [];
     for (let i = 1; i <= parts.length; i++) {
       ancestors.push("/" + parts.slice(0, i).join("/") + "/");

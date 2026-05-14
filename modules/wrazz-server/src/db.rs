@@ -10,15 +10,101 @@
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 use uuid::Uuid;
+use wrazz_core::WorkspaceSummary;
 
 use crate::User;
 
 // --- Workspace queries ---
 
+/// Returns all workspaces owned by `user_id`, ordered by creation date.
+pub async fn list_workspaces(
+    pool: &SqlitePool,
+    user_id: Uuid,
+) -> sqlx::Result<Vec<WorkspaceSummary>> {
+    let rows: Vec<(String, String)> = sqlx::query_as(
+        "SELECT id, name FROM workspaces WHERE user_id = ? ORDER BY created_at ASC",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(|(id, name)| WorkspaceSummary { id, name }).collect())
+}
+
+/// Returns a single workspace if it exists and is owned by `user_id`.
+pub async fn get_workspace(
+    pool: &SqlitePool,
+    workspace_id: &str,
+    user_id: Uuid,
+) -> sqlx::Result<Option<WorkspaceSummary>> {
+    let row: Option<(String, String)> = sqlx::query_as(
+        "SELECT id, name FROM workspaces WHERE id = ? AND user_id = ?",
+    )
+    .bind(workspace_id)
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.map(|(id, name)| WorkspaceSummary { id, name }))
+}
+
+/// Creates a new workspace for `user_id` and returns its summary.
+pub async fn create_workspace(
+    pool: &SqlitePool,
+    user_id: Uuid,
+    name: &str,
+) -> sqlx::Result<WorkspaceSummary> {
+    let id = Uuid::new_v4().to_string();
+    sqlx::query("INSERT INTO workspaces (id, user_id, name) VALUES (?, ?, ?)")
+        .bind(&id)
+        .bind(user_id)
+        .bind(name)
+        .execute(pool)
+        .await?;
+
+    Ok(WorkspaceSummary { id, name: name.to_string() })
+}
+
+/// Renames `workspace_id` if it belongs to `user_id`.
+/// Returns `true` if a row was updated.
+pub async fn rename_workspace(
+    pool: &SqlitePool,
+    workspace_id: &str,
+    user_id: Uuid,
+    new_name: &str,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query(
+        "UPDATE workspaces SET name = ? WHERE id = ? AND user_id = ?",
+    )
+    .bind(new_name)
+    .bind(workspace_id)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+/// Deletes `workspace_id` if it belongs to `user_id`.
+/// Returns `true` if a row was deleted.
+pub async fn delete_workspace(
+    pool: &SqlitePool,
+    workspace_id: &str,
+    user_id: Uuid,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query(
+        "DELETE FROM workspaces WHERE id = ? AND user_id = ?",
+    )
+    .bind(workspace_id)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
+}
+
 /// Returns the default workspace ID for `user_id`, creating one if none exists.
-///
-/// The workspace ID is a UUID string. The filesystem directory for the workspace
-/// is still `<data_dir>/<user_id>/` until the workspace layout migration is done.
+/// Used by the filesystem migration to ensure every user has a workspace row.
 pub async fn get_or_create_default_workspace(
     pool: &SqlitePool,
     user_id: Uuid,
@@ -34,7 +120,7 @@ pub async fn get_or_create_default_workspace(
     }
 
     let workspace_id = Uuid::new_v4().to_string();
-    sqlx::query("INSERT INTO workspaces (id, user_id) VALUES (?, ?)")
+    sqlx::query("INSERT INTO workspaces (id, user_id, name) VALUES (?, ?, 'Workspace')")
         .bind(&workspace_id)
         .bind(user_id)
         .execute(pool)

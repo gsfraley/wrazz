@@ -22,33 +22,38 @@ export interface FileContent {
   content: string;
 }
 
+function wsBase(workspaceId: string): string {
+  return `/api/workspaces/${workspaceId}`;
+}
+
 function pathToUrl(path: string): string {
   return path.replace(/^\/|\/$/g, "");
 }
 
-export async function listEntries(path = "/"): Promise<Entry[]> {
+export async function listEntries(workspaceId: string, path = "/"): Promise<Entry[]> {
   const params = new URLSearchParams({ path });
-  const resp = await apiFetch(`/api/entries?${params}`);
+  const resp = await apiFetch(`${wsBase(workspaceId)}/entries?${params}`);
   return resp.json();
 }
 
-export async function getFile(path: string): Promise<FileEntry> {
-  const resp = await apiFetch(`/api/files/${pathToUrl(path)}`);
+export async function getFile(workspaceId: string, path: string): Promise<FileEntry> {
+  const resp = await apiFetch(`${wsBase(workspaceId)}/files/${pathToUrl(path)}`);
   return resp.json();
 }
 
-export async function getFileContent(path: string): Promise<FileContent> {
-  const resp = await apiFetch(`/api/content/${pathToUrl(path)}`);
+export async function getFileContent(workspaceId: string, path: string): Promise<FileContent> {
+  const resp = await apiFetch(`${wsBase(workspaceId)}/content/${pathToUrl(path)}`);
   return resp.json();
 }
 
 export async function createFile(
+  workspaceId: string,
   path: string,
   title: string | null,
   tags: string[],
   content: string,
 ): Promise<FileEntry> {
-  const resp = await apiFetch(`/api/files/${pathToUrl(path)}`, {
+  const resp = await apiFetch(`${wsBase(workspaceId)}/files/${pathToUrl(path)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title, tags, content }),
@@ -57,12 +62,13 @@ export async function createFile(
 }
 
 export async function updateFile(
+  workspaceId: string,
   path: string,
   title: string | null,
   tags: string[],
   content: string,
 ): Promise<FileEntry> {
-  const resp = await apiFetch(`/api/files/${pathToUrl(path)}`, {
+  const resp = await apiFetch(`${wsBase(workspaceId)}/files/${pathToUrl(path)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title, tags, content }),
@@ -70,31 +76,31 @@ export async function updateFile(
   return resp.json();
 }
 
-export async function deleteEntry(path: string): Promise<void> {
-  await apiFetch(`/api/entries/${pathToUrl(path)}`, { method: "DELETE" });
+export async function deleteEntry(workspaceId: string, path: string): Promise<void> {
+  await apiFetch(`${wsBase(workspaceId)}/entries/${pathToUrl(path)}`, { method: "DELETE" });
 }
 
-export async function createDir(path: string): Promise<void> {
-  await apiFetch(`/api/dirs/${pathToUrl(path)}`, { method: "POST" });
+export async function createDir(workspaceId: string, path: string): Promise<void> {
+  await apiFetch(`${wsBase(workspaceId)}/dirs/${pathToUrl(path)}`, { method: "POST" });
 }
 
-export async function moveEntry(fromPath: string, toPath: string): Promise<void> {
-  await apiFetch(`/api/entries/${pathToUrl(fromPath)}`, {
+export async function moveEntry(workspaceId: string, fromPath: string, toPath: string): Promise<void> {
+  await apiFetch(`${wsBase(workspaceId)}/entries/${pathToUrl(fromPath)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ to_path: toPath }),
   });
 }
 
-export async function listAllFilePaths(path = "/"): Promise<string[]> {
-  const entries = await listEntries(path).catch(() => []);
+export async function listAllFilePaths(workspaceId: string, path = "/"): Promise<string[]> {
+  const entries = await listEntries(workspaceId, path).catch(() => []);
   const paths: string[] = [];
   await Promise.all(
     entries.map(async (e) => {
       if (e.kind === "file") {
         paths.push(e.path);
       } else {
-        paths.push(...(await listAllFilePaths(e.path)));
+        paths.push(...(await listAllFilePaths(workspaceId, e.path)));
       }
     }),
   );
@@ -106,15 +112,15 @@ export interface FileSummary {
   title: string | null;
 }
 
-export async function listAllFiles(path = "/"): Promise<FileSummary[]> {
-  const entries = await listEntries(path).catch(() => []);
+export async function listAllFiles(workspaceId: string, path = "/"): Promise<FileSummary[]> {
+  const entries = await listEntries(workspaceId, path).catch(() => []);
   const files: FileSummary[] = [];
   await Promise.all(
     entries.map(async (e) => {
       if (e.kind === "file") {
         files.push({ path: e.path, title: e.title });
       } else {
-        files.push(...(await listAllFiles(e.path)));
+        files.push(...(await listAllFiles(workspaceId, e.path)));
       }
     }),
   );

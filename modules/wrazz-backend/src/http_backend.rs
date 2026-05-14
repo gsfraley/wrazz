@@ -5,13 +5,8 @@ use wrazz_core::{Backend, BackendError, BackendResult, Entry, FileContent, FileE
 /// [`Backend`] implementation that proxies all operations to a remote
 /// `wrazz-server` over HTTP.
 ///
-/// The `workspace` parameter is forwarded on every request as a `?workspace=`
-/// query param. The server currently derives the workspace from the session
-/// cookie and ignores it, but it is included preemptively so the wire format
-/// is ready for multi-workspace support.
-///
-/// For `move_entry`, the source workspace is `?workspace=` and the destination
-/// workspace is `to_workspace` in the request body.
+/// All file routes are under `/api/workspaces/{workspace_id}/...` and the
+/// workspace ID is embedded directly in the URL path.
 pub struct HttpBackend {
     base_url: String,
     client: Client,
@@ -29,23 +24,10 @@ impl HttpBackend {
         }
     }
 
-    fn entries_url(&self) -> String {
-        format!("{}/api/entries", self.base_url)
+    fn workspace_base(&self, workspace: &str) -> String {
+        format!("{}/api/workspaces/{}", self.base_url, workspace)
     }
 
-    fn files_url(&self) -> String {
-        format!("{}/api/files", self.base_url)
-    }
-
-    fn content_url(&self) -> String {
-        format!("{}/api/content", self.base_url)
-    }
-
-    fn dirs_url(&self) -> String {
-        format!("{}/api/dirs", self.base_url)
-    }
-
-    /// Strips the leading `/` from a Backend path for use in URLs.
     fn url_path(path: &str) -> &str {
         path.trim_start_matches('/')
     }
@@ -67,10 +49,11 @@ async fn error_from_response(resp: reqwest::Response, path: &str) -> BackendErro
 #[async_trait]
 impl Backend for HttpBackend {
     async fn list_entries(&self, workspace: &str, path: &str) -> BackendResult<Vec<Entry>> {
+        let url = format!("{}/entries", self.workspace_base(workspace));
         let resp = self
             .client
-            .get(self.entries_url())
-            .query(&[("workspace", workspace), ("path", path)])
+            .get(&url)
+            .query(&[("path", path)])
             .send()
             .await
             .map_err(|e| BackendError::Internal(Box::new(e)))?;
@@ -85,11 +68,10 @@ impl Backend for HttpBackend {
     }
 
     async fn get_file(&self, workspace: &str, path: &str) -> BackendResult<FileEntry> {
-        let url = format!("{}/{}", self.files_url(), Self::url_path(path));
+        let url = format!("{}/files/{}", self.workspace_base(workspace), Self::url_path(path));
         let resp = self
             .client
             .get(&url)
-            .query(&[("workspace", workspace)])
             .send()
             .await
             .map_err(|e| BackendError::Internal(Box::new(e)))?;
@@ -104,11 +86,10 @@ impl Backend for HttpBackend {
     }
 
     async fn get_file_content(&self, workspace: &str, path: &str) -> BackendResult<FileContent> {
-        let url = format!("{}/{}", self.content_url(), Self::url_path(path));
+        let url = format!("{}/content/{}", self.workspace_base(workspace), Self::url_path(path));
         let resp = self
             .client
             .get(&url)
-            .query(&[("workspace", workspace)])
             .send()
             .await
             .map_err(|e| BackendError::Internal(Box::new(e)))?;
@@ -130,11 +111,10 @@ impl Backend for HttpBackend {
         tags: Vec<String>,
         content: String,
     ) -> BackendResult<FileEntry> {
-        let url = format!("{}/{}", self.files_url(), Self::url_path(path));
+        let url = format!("{}/files/{}", self.workspace_base(workspace), Self::url_path(path));
         let resp = self
             .client
             .post(&url)
-            .query(&[("workspace", workspace)])
             .json(&serde_json::json!({ "title": title, "tags": tags, "content": content }))
             .send()
             .await
@@ -157,11 +137,10 @@ impl Backend for HttpBackend {
         tags: Vec<String>,
         content: String,
     ) -> BackendResult<FileEntry> {
-        let url = format!("{}/{}", self.files_url(), Self::url_path(path));
+        let url = format!("{}/files/{}", self.workspace_base(workspace), Self::url_path(path));
         let resp = self
             .client
             .put(&url)
-            .query(&[("workspace", workspace)])
             .json(&serde_json::json!({ "title": title, "tags": tags, "content": content }))
             .send()
             .await
@@ -177,11 +156,10 @@ impl Backend for HttpBackend {
     }
 
     async fn delete_entry(&self, workspace: &str, path: &str) -> BackendResult<()> {
-        let url = format!("{}/{}", self.entries_url(), Self::url_path(path));
+        let url = format!("{}/entries/{}", self.workspace_base(workspace), Self::url_path(path));
         let resp = self
             .client
             .delete(&url)
-            .query(&[("workspace", workspace)])
             .send()
             .await
             .map_err(|e| BackendError::Internal(Box::new(e)))?;
@@ -190,11 +168,10 @@ impl Backend for HttpBackend {
     }
 
     async fn create_dir(&self, workspace: &str, path: &str) -> BackendResult<()> {
-        let url = format!("{}/{}", self.dirs_url(), Self::url_path(path));
+        let url = format!("{}/dirs/{}", self.workspace_base(workspace), Self::url_path(path));
         let resp = self
             .client
             .post(&url)
-            .query(&[("workspace", workspace)])
             .send()
             .await
             .map_err(|e| BackendError::Internal(Box::new(e)))?;
@@ -209,11 +186,10 @@ impl Backend for HttpBackend {
         ws_to: &str,
         path_to: &str,
     ) -> BackendResult<()> {
-        let url = format!("{}/{}", self.entries_url(), Self::url_path(path_from));
+        let url = format!("{}/entries/{}", self.workspace_base(ws_from), Self::url_path(path_from));
         let resp = self
             .client
             .patch(&url)
-            .query(&[("workspace", ws_from)])
             .json(&serde_json::json!({ "to_workspace": ws_to, "to_path": path_to }))
             .send()
             .await

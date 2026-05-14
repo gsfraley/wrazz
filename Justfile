@@ -30,7 +30,7 @@ run:
 
 # Run the Rust server with live reload
 run-server:
-    cargo watch -x 'run -p wrazz-server'
+    RUST_LOG=info WRAZZ_BOOTSTRAP_ADMIN=admin:secret WRAZZ_BIND=0.0.0.0:3001 WRAZZ_STATIC_DIR=modules/wrazz-frontend/dist cargo watch -x 'run -p wrazz-server'
 
 # Run the frontend dev server (editor source is live via vite alias — no build-editor needed)
 run-frontend:

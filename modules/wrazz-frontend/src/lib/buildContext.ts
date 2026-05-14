@@ -13,6 +13,11 @@ import { useUIStore } from "@/stores/uiStore";
 import { ApiError } from "@/lib/apiError";
 import * as filesApi from "@/api/files";
 import type { Entry } from "@/api/files";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+
+function activeWorkspaceId(): string | null {
+  return useWorkspaceStore.getState().activeWorkspaceId;
+}
 
 // ── Path helpers ──────────────────────────────────────────────────────────────
 
@@ -51,7 +56,7 @@ async function tryUniqueName(
 
 // ── Entry builders ────────────────────────────────────────────────────────────
 
-function buildFileEntry(raw: Entry & { kind: "file" }, draftPaths: Set<string>): FileEntry {
+function buildFileEntry(raw: Entry & { kind: "file" }, draftPaths: Set<string>, wsId: string): FileEntry {
   return {
     kind: "file",
     path: raw.path,
@@ -63,7 +68,7 @@ function buildFileEntry(raw: Entry & { kind: "file" }, draftPaths: Set<string>):
     },
 
     async delete() {
-      await filesApi.deleteEntry(raw.path);
+      await filesApi.deleteEntry(wsId, raw.path);
       await useTreeStore.getState().refreshDir(parentDir(raw.path));
       const { activePath, closeFile } = useDocumentStore.getState();
       if (activePath === raw.path) closeFile();
@@ -73,7 +78,7 @@ function buildFileEntry(raw: Entry & { kind: "file" }, draftPaths: Set<string>):
       const newName = name ?? entryName(raw.path);
       const prefix = into.path === "/" ? "" : into.path.replace(/\/$/, "");
       const newPath = `${prefix}/${newName}`;
-      await filesApi.moveEntry(raw.path, newPath);
+      await filesApi.moveEntry(wsId, raw.path, newPath);
       const srcParent = parentDir(raw.path);
       await useTreeStore.getState().refreshDir(srcParent);
       if (into.path !== srcParent) await useTreeStore.getState().refreshDir(into.path);
@@ -87,11 +92,12 @@ function buildChildren(
   rawChildren: Entry[] | undefined,
   treeState: ReturnType<typeof useTreeStore.getState>,
   draftPaths: Set<string>,
+  wsId: string,
 ): TreeEntry[] | null {
   if (!rawChildren) return null;
   return rawChildren.map((c) => {
-    if (c.kind === "file") return buildFileEntry(c, draftPaths);
-    return buildDirEntry(c, treeState, draftPaths);
+    if (c.kind === "file") return buildFileEntry(c, draftPaths, wsId);
+    return buildDirEntry(c, treeState, draftPaths, wsId);
   });
 }
 
@@ -99,9 +105,10 @@ function buildDirEntry(
   raw: Entry & { kind: "dir" },
   treeState: ReturnType<typeof useTreeStore.getState>,
   draftPaths: Set<string>,
+  wsId: string,
 ): DirEntry {
   const rawChildren = treeState.children.get(raw.path);
-  const children = buildChildren(rawChildren, treeState, draftPaths);
+  const children = buildChildren(rawChildren, treeState, draftPaths, wsId);
 
   return {
     kind: "dir",
@@ -115,7 +122,7 @@ function buildDirEntry(
         async (name) => {
           const prefix = raw.path.replace(/\/$/, "");
           const path = `${prefix}/${name}`;
-          await filesApi.createFile(path, opts?.title ?? null, [], opts?.content ?? "");
+          await filesApi.createFile(wsId, path, opts?.title ?? null, [], opts?.content ?? "");
           await useTreeStore.getState().refreshDir(raw.path);
           useUIStore.getState().setInlineEditPath(path);
           await useDocumentStore.getState().openFile(path);
@@ -131,7 +138,7 @@ function buildDirEntry(
         async (name) => {
           const prefix = raw.path.replace(/\/$/, "");
           const path = `${prefix}/${name}/`;
-          await filesApi.createDir(path);
+          await filesApi.createDir(wsId, path);
           await useTreeStore.getState().refreshDir(raw.path);
           useUIStore.getState().setInlineEditPath(path);
         },
@@ -143,19 +150,19 @@ function buildDirEntry(
     async createFile(name, opts) {
       const prefix = raw.path.replace(/\/$/, "");
       const path = `${prefix}/${name}`;
-      await filesApi.createFile(path, opts?.title ?? null, [], opts?.content ?? "");
+      await filesApi.createFile(wsId, path, opts?.title ?? null, [], opts?.content ?? "");
       await useTreeStore.getState().refreshDir(raw.path);
     },
 
     async createDir(name) {
       const prefix = raw.path.replace(/\/$/, "");
       const path = `${prefix}/${name}/`;
-      await filesApi.createDir(path);
+      await filesApi.createDir(wsId, path);
       await useTreeStore.getState().refreshDir(raw.path);
     },
 
     async delete() {
-      await filesApi.deleteEntry(raw.path);
+      await filesApi.deleteEntry(wsId, raw.path);
       useTreeStore.getState().collapseDir(raw.path);
       await useTreeStore.getState().refreshDir(parentDir(raw.path));
       const { activePath, closeFile } = useDocumentStore.getState();
@@ -166,7 +173,7 @@ function buildDirEntry(
       const newName = name ?? entryName(raw.path);
       const prefix = into.path === "/" ? "" : into.path.replace(/\/$/, "");
       const newPath = `${prefix}/${newName}/`;
-      await filesApi.moveEntry(raw.path, newPath);
+      await filesApi.moveEntry(wsId, raw.path, newPath);
       useTreeStore.getState().collapseDir(raw.path);
       const srcParent = parentDir(raw.path);
       await useTreeStore.getState().refreshDir(srcParent);
@@ -178,8 +185,9 @@ function buildDirEntry(
 function buildRootEntry(
   treeState: ReturnType<typeof useTreeStore.getState>,
   draftPaths: Set<string>,
+  wsId: string,
 ): RootEntry {
-  const children = buildChildren(treeState.root, treeState, draftPaths);
+  const children = buildChildren(treeState.root, treeState, draftPaths, wsId);
 
   return {
     kind: "root",
@@ -190,7 +198,7 @@ function buildRootEntry(
       await tryUniqueName(
         async (name) => {
           const path = `/${name}`;
-          await filesApi.createFile(path, opts?.title ?? null, [], opts?.content ?? "");
+          await filesApi.createFile(wsId, path, opts?.title ?? null, [], opts?.content ?? "");
           await useTreeStore.getState().refreshDir("/");
           useUIStore.getState().setInlineEditPath(path);
           await useDocumentStore.getState().openFile(path);
@@ -204,7 +212,7 @@ function buildRootEntry(
       await tryUniqueName(
         async (name) => {
           const path = `/${name}/`;
-          await filesApi.createDir(path);
+          await filesApi.createDir(wsId, path);
           await useTreeStore.getState().refreshDir("/");
           useUIStore.getState().setInlineEditPath(path);
         },
@@ -215,13 +223,13 @@ function buildRootEntry(
 
     async createFile(name, opts) {
       const path = `/${name}`;
-      await filesApi.createFile(path, opts?.title ?? null, [], opts?.content ?? "");
+      await filesApi.createFile(wsId, path, opts?.title ?? null, [], opts?.content ?? "");
       await useTreeStore.getState().refreshDir("/");
     },
 
     async createDir(name) {
       const path = `/${name}/`;
-      await filesApi.createDir(path);
+      await filesApi.createDir(wsId, path);
       await useTreeStore.getState().refreshDir("/");
     },
   };
@@ -234,15 +242,16 @@ function buildRootEntry(
 export function buildTargetForPath(path: string): TreeEntry {
   const treeState = useTreeStore.getState();
   const draftPaths = useDraftStore.getState().draftPaths;
+  const wsId = activeWorkspaceId() ?? "";
 
   if (path === "/") {
-    return buildRootEntry(treeState, draftPaths);
+    return buildRootEntry(treeState, draftPaths, wsId);
   }
 
   if (path.endsWith("/")) {
     // Synthetic Entry for a dir we know by path
     const raw = { kind: "dir" as const, path, created_at: "", updated_at: "" };
-    return buildDirEntry(raw, treeState, draftPaths);
+    return buildDirEntry(raw, treeState, draftPaths, wsId);
   }
 
   const raw = {
@@ -253,7 +262,7 @@ export function buildTargetForPath(path: string): TreeEntry {
     created_at: "",
     updated_at: "",
   };
-  return buildFileEntry(raw, draftPaths);
+  return buildFileEntry(raw, draftPaths, wsId);
 }
 
 // ── buildContext ──────────────────────────────────────────────────────────────
@@ -262,11 +271,12 @@ export function buildContext(): Context | null {
   const { user, activeCtx, openModal, openConfirm, performLogout, setPaletteOpen } = useUIStore.getState();
   if (!user) return null;
 
+  const wsId = activeWorkspaceId() ?? "";
   const treeState = useTreeStore.getState();
   const docState  = useDocumentStore.getState();
   const draftPaths = useDraftStore.getState().draftPaths;
 
-  const root = buildRootEntry(treeState, draftPaths);
+  const root = buildRootEntry(treeState, draftPaths, wsId);
 
   const openFile: OpenFile | null = docState.activePath
     ? {

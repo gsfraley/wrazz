@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{path::PathBuf, sync::Arc};
 
 use argon2::{
     Argon2, PasswordHasher,
@@ -6,20 +6,21 @@ use argon2::{
 };
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use tokio::sync::RwLock;
+use wrazz_backend::WorkspaceRegistry;
 
 use wrazz_server::db;
+use wrazz_server::migrate;
 use wrazz_server::routes;
 use wrazz_server::routes::oidc::OidcProvider;
 use wrazz_server::state::AppState;
-use wrazz_server::store_cache;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    let data_dir: std::path::PathBuf =
+    let data_dir: PathBuf =
         std::env::var("WRAZZ_DATA_DIR").unwrap_or_else(|_| "./data".into()).into();
     let bind = std::env::var("WRAZZ_BIND").unwrap_or_else(|_| "127.0.0.1:3001".into());
     let static_dir = std::env::var("WRAZZ_STATIC_DIR").ok();
@@ -46,24 +47,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     maybe_bootstrap_admin(&pool).await;
 
-    let store_cache = Arc::new(store_cache::StoreCache::new(&data_dir));
+    // Run filesystem migrations (e.g. workspace directory nesting).
+    if let Err(e) = migrate::run(&data_dir, &pool).await {
+        tracing::error!("filesystem migration failed: {e}");
+        return Err(e.into());
+    }
 
+    let workspace_registry = Arc::new(WorkspaceRegistry::new());
     let oidc_provider = Arc::new(RwLock::new(build_oidc_provider(&pool).await));
 
     let state = AppState {
         pool: pool.clone(),
-        store_cache: Arc::clone(&store_cache),
+        workspace_registry: Arc::clone(&workspace_registry),
+        data_dir: Arc::new(data_dir),
         oidc_provider,
         session_duration: chrono::Duration::hours(session_hours),
         public_url,
     };
 
-    // Background task: expire sessions and evict idle store entries hourly.
+    // Background task: expire sessions hourly.
     {
         let pool = pool.clone();
-        let store_cache = Arc::clone(&store_cache);
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(3600));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
             loop {
                 interval.tick().await;
                 match db::delete_expired_sessions(&pool).await {
@@ -71,7 +77,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Err(e) => tracing::warn!("session cleanup error: {e}"),
                     _ => {}
                 }
-                store_cache.evict_expired().await;
             }
         });
     }
@@ -84,8 +89,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Creates the first admin account from `WRAZZ_BOOTSTRAP_ADMIN=username:password`
-/// if the env var is set and no admin users exist yet.
 async fn maybe_bootstrap_admin(pool: &sqlx::SqlitePool) {
     let raw = match std::env::var("WRAZZ_BOOTSTRAP_ADMIN") {
         Ok(v) => v,
@@ -101,24 +104,15 @@ async fn maybe_bootstrap_admin(pool: &sqlx::SqlitePool) {
     };
 
     match db::has_any_admin(pool).await {
-        Ok(true) => {
-            tracing::debug!("admin already exists, skipping bootstrap");
-            return;
-        }
-        Err(e) => {
-            tracing::warn!("could not check for existing admins: {e}");
-            return;
-        }
+        Ok(true) => { tracing::debug!("admin already exists, skipping bootstrap"); return; }
+        Err(e) => { tracing::warn!("could not check for existing admins: {e}"); return; }
         Ok(false) => {}
     }
 
     let salt = SaltString::generate(&mut OsRng);
     let hash = match Argon2::default().hash_password(password.as_bytes(), &salt) {
         Ok(h) => h.to_string(),
-        Err(e) => {
-            tracing::warn!("could not hash bootstrap admin password: {e}");
-            return;
-        }
+        Err(e) => { tracing::warn!("could not hash bootstrap admin password: {e}"); return; }
     };
 
     match db::create_user_with_password(pool, username, username, &hash, true).await {
@@ -127,14 +121,7 @@ async fn maybe_bootstrap_admin(pool: &sqlx::SqlitePool) {
     }
 }
 
-/// Determines the initial OIDC provider at startup.
-///
-/// Precedence: env vars > DB config. Both sources attempt discovery; if the
-/// preferred source's discovery fails, the other source is not tried (env vars
-/// are authoritative when present; DB config is authoritative when env vars are
-/// absent).
 async fn build_oidc_provider(pool: &sqlx::SqlitePool) -> Option<Arc<OidcProvider>> {
-    // Env vars take unconditional precedence.
     if let (Ok(issuer), Ok(client_id), Ok(secret), Ok(redirect_uri)) = (
         std::env::var("WRAZZ_OIDC_ISSUER_URL"),
         std::env::var("WRAZZ_OIDC_CLIENT_ID"),
@@ -142,35 +129,19 @@ async fn build_oidc_provider(pool: &sqlx::SqlitePool) -> Option<Arc<OidcProvider
         std::env::var("WRAZZ_OIDC_REDIRECT_URI"),
     ) {
         return match OidcProvider::discover(issuer, client_id, secret, redirect_uri).await {
-            Ok(p) => {
-                tracing::info!("OIDC provider configured from environment variables");
-                Some(Arc::new(p))
-            }
-            Err(e) => {
-                tracing::warn!("OIDC env var discovery failed, OIDC unavailable: {e}");
-                None
-            }
+            Ok(p) => { tracing::info!("OIDC configured from env"); Some(Arc::new(p)) }
+            Err(e) => { tracing::warn!("OIDC env discovery failed: {e}"); None }
         };
     }
 
-    // Fall back to DB config.
     match db::get_oidc_config(pool).await {
         Ok(Some(c)) if c.enabled => {
             match OidcProvider::discover(c.issuer_url, c.client_id, c.client_secret, c.redirect_uri).await {
-                Ok(p) => {
-                    tracing::info!("OIDC provider configured from database");
-                    Some(Arc::new(p))
-                }
-                Err(e) => {
-                    tracing::warn!("OIDC DB config discovery failed, OIDC unavailable: {e}");
-                    None
-                }
+                Ok(p) => { tracing::info!("OIDC configured from database"); Some(Arc::new(p)) }
+                Err(e) => { tracing::warn!("OIDC DB discovery failed: {e}"); None }
             }
         }
         Ok(_) => None,
-        Err(e) => {
-            tracing::warn!("failed to read OIDC config from DB: {e}");
-            None
-        }
+        Err(e) => { tracing::warn!("failed to read OIDC config: {e}"); None }
     }
 }

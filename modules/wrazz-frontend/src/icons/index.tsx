@@ -148,3 +148,20 @@ export function LogOut({ size = 16, ...props }: IconProps) {
     </svg>
   );
 }
+
+export function Check({ size = 16, ...props }: IconProps) {
+  return (
+    <svg {...defaults(size)} {...props}>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+export function Plus({ size = 16, ...props }: IconProps) {
+  return (
+    <svg {...defaults(size)} {...props}>
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </svg>
+  );
+}

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use uuid::Uuid;
-use wrazz_backend::{HttpBackend, LocalBackend, Store};
+use wrazz_backend::{HttpBackend, LocalWorkspace, RegistryBackend, Store, WorkspaceRegistry};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,9 +25,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 tokio::fs::create_dir_all(&data_dir).await?;
                 let workspace_id = std::env::var("WRAZZ_WORKSPACE_ID")
                     .unwrap_or_else(|_| Uuid::new_v4().to_string());
+                let workspace_name = std::env::var("WRAZZ_WORKSPACE_NAME")
+                    .unwrap_or_else(|_| "Workspace".into());
                 tracing::info!("local mode — data dir: {data_dir}, workspace: {workspace_id}");
-                let backend = LocalBackend::new(&workspace_id, Store::new(&data_dir));
-                (Arc::new(backend), workspace_id)
+                let registry = Arc::new(WorkspaceRegistry::new());
+                let ws = Arc::new(LocalWorkspace::new(
+                    &workspace_id,
+                    &workspace_name,
+                    Store::new(&data_dir),
+                ));
+                registry.add(ws).await;
+                (Arc::new(RegistryBackend::new(registry)), workspace_id)
             }
         };
 

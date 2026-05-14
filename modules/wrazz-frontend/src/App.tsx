@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/api/auth";
 import { useDraftStore } from "@/stores/draftStore";
 import { useTreeStore } from "@/stores/treeStore";
 import { useUIStore } from "@/stores/uiStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import FileTree from "@/components/FileTree";
 import Editor from "@/components/Editor";
 import CommandBar from "@/components/CommandBar";
@@ -44,9 +45,10 @@ export default function App() {
 
   useEffect(() => {
     getCurrentUser()
-      .then((u) => {
+      .then(async (u) => {
         setUser(u);
         if (u) {
+          await useWorkspaceStore.getState().load();
           void useTreeStore.getState().reload();
           void useDraftStore.getState().initializeDraftPaths();
         }
@@ -101,8 +103,9 @@ export default function App() {
   if (!user) {
     return (
       <LoginPage
-        onLogin={(u) => {
+        onLogin={async (u) => {
           setUser(u);
+          await useWorkspaceStore.getState().load();
           void useTreeStore.getState().reload();
           void useDraftStore.getState().initializeDraftPaths();
         }}

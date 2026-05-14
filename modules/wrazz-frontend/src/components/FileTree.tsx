@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTreeStore } from "@/stores/treeStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useDraftStore } from "@/stores/draftStore";
 import { useUIStore } from "@/stores/uiStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useFileTreeOperations } from "@/components/tree/useFileTreeOperations";
 import FileRow from "@/components/tree/FileRow";
 import DirRow from "@/components/tree/DirRow";
-import { Menu } from "@/icons";
+import { Menu, Check, Plus, ChevronDown } from "@/icons";
 import { cx } from "@/lib/utils";
 import { buildContext, buildTargetForPath } from "@/lib/buildContext";
 import { hooksForContextMenu, contextMenuItems } from "@/lib/pluginRegistry";
@@ -35,10 +36,33 @@ export default function FileTree({ width }: FileTreeProps) {
   const { activePath } = useDocumentStore();
   const { draftPaths } = useDraftStore();
   const { setActiveCtx, openCtxMenu } = useUIStore();
+  const { workspaces, activeWorkspaceId, setActive, createWorkspace } = useWorkspaceStore();
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
 
   const ops = useFileTreeOperations();
   const [dragPath, setDragPath] = useState<string | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [pickerOpen]);
+
+  async function handleNewWorkspace() {
+    setPickerOpen(false);
+    const name = window.prompt("Workspace name:");
+    if (!name?.trim()) return;
+    const ws = await createWorkspace(name.trim());
+    setActive(ws.id);
+  }
 
   // Scroll the active file into view whenever it changes or a directory expands to reveal it.
   useEffect(() => {
@@ -152,8 +176,15 @@ export default function FileTree({ width }: FileTreeProps) {
 
   return (
     <aside className={styles.sidebar} style={{ width }} onClick={() => setActiveCtx("fileTree")}>
-      <div className={styles.sidebarHeader}>
-        <span className={styles.sidebarHeading}>Workspace</span>
+      <div className={styles.sidebarHeader} ref={pickerRef}>
+        <button
+          className={styles.workspaceBtn}
+          onClick={() => setPickerOpen((o) => !o)}
+          title="Switch workspace"
+        >
+          <span className={styles.workspaceBtnLabel}>{activeWorkspace?.name ?? "Workspace"}</span>
+          <ChevronDown size={12} className={cx(styles.workspaceBtnChevron, pickerOpen && styles.workspaceBtnChevronOpen)} />
+        </button>
         <div className={styles.sidebarMenu}>
           <button
             className={styles.sidebarMenuBtn}
@@ -163,6 +194,29 @@ export default function FileTree({ width }: FileTreeProps) {
             <Menu size={14} />
           </button>
         </div>
+        {pickerOpen && (
+          <div className={styles.wsDropdown}>
+            {workspaces.map((ws) => (
+              <button
+                key={ws.id}
+                className={cx(styles.wsItem, ws.id === activeWorkspaceId && styles.wsItemActive)}
+                onClick={() => { setActive(ws.id); setPickerOpen(false); }}
+              >
+                <span className={styles.wsItemCheck}>
+                  {ws.id === activeWorkspaceId && <Check size={12} />}
+                </span>
+                <span className={styles.wsItemName}>{ws.name}</span>
+              </button>
+            ))}
+            <button
+              className={cx(styles.wsItem, styles.wsItemNew)}
+              onClick={() => { void handleNewWorkspace(); }}
+            >
+              <span className={styles.wsItemCheck}><Plus size={12} /></span>
+              <span className={styles.wsItemName}>New workspace</span>
+            </button>
+          </div>
+        )}
       </div>
       <div
         className={styles.tree}

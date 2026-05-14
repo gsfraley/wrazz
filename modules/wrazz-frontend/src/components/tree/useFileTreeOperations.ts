@@ -3,6 +3,11 @@ import { moveEntry } from "@/api/files";
 import { useTreeStore } from "@/stores/treeStore";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUIStore } from "@/stores/uiStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+
+function activeWorkspaceId(): string | null {
+  return useWorkspaceStore.getState().activeWorkspaceId;
+}
 
 function entryName(path: string): string {
   const clean = path.endsWith("/") ? path.slice(0, -1) : path;
@@ -81,8 +86,10 @@ export function useFileTreeOperations(): FileTreeOps {
     const dirPrefix = parent === "/" ? "" : parent.replace(/\/$/, "");
     const newPath = isDir ? `${dirPrefix}/${newName}/` : `${dirPrefix}/${newName}`;
 
+    const wsId = activeWorkspaceId();
+    if (!wsId) return;
     try {
-      await moveEntry(editingPath, newPath);
+      await moveEntry(wsId, editingPath, newPath);
       if (isDir) collapseDir(editingPath);
       await refreshDir(parent);
       if (!isDir && editingPath === activePath) await openFile(newPath);
@@ -99,8 +106,10 @@ export function useFileTreeOperations(): FileTreeOps {
     const newPath = isDir ? `${prefix}/${srcName}/` : `${prefix}/${srcName}`;
     if (newPath === src) return;
 
+    const wsId = activeWorkspaceId();
+    if (!wsId) return;
     try {
-      await moveEntry(src, newPath);
+      await moveEntry(wsId, src, newPath);
       const srcParent = parentDir(src);
       await refreshDir(srcParent);
       if (destDir !== srcParent) await refreshDir(destDir);
