@@ -163,6 +163,7 @@ export default function CommandBar() {
             onFocus={() => { if (!open) openPalette(); }}
             onKeyDown={handleInputKeyDown}
             placeholder={open ? "Search or run a command…" : (editorTitle || "Search or run a command…")}
+            tabIndex={-1}
             autoComplete="off"
             spellCheck={false}
           />
