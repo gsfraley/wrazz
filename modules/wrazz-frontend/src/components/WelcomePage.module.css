@@ -1,0 +1,157 @@
+.welcome {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px;
+  max-width: 380px;
+  width: 100%;
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--ink-muted);
+  opacity: 0.6;
+  margin: 0;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.02em;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink-muted);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  text-align: left;
+}
+
+.actionBtn:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--ink-muted);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.actionBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.orLabel {
+  font-size: 11px;
+  color: var(--ink-muted);
+  opacity: 0.5;
+  margin: 0;
+  text-align: center;
+}
+
+.connectRow {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+.connectInput {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  outline: none;
+  min-width: 0;
+}
+
+.connectInput:focus {
+  border-color: var(--ink-muted);
+}
+
+.connectInput::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.5;
+}
+
+.connectInput:disabled {
+  opacity: 0.5;
+}
+
+.connectBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink-muted);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.connectBtn:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--ink-muted);
+}
+
+.connectBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.errorMsg {
+  font-size: 12px;
+  color: #b00;
+  text-align: center;
+  margin: 0;
+}
+
+.fileActions {
+  display: flex;
+  gap: 8px;
+}
+
+.fileActionBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink-muted);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.fileActionBtn:hover {
+  color: var(--ink);
+  border-color: var(--ink-muted);
+  background: rgba(0, 0, 0, 0.02);
+}

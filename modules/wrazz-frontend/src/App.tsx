@@ -12,7 +12,7 @@ import StatusBar from "@/components/StatusBar";
 import LoginPage from "@/components/LoginPage";
 import ContextMenu from "@/components/ContextMenu";
 import ConfirmModal from "@/components/modals/ConfirmModal";
-import DesktopSettingsModal from "@/components/modals/DesktopSettingsModal";
+import ConnectModal from "@/components/modals/ConnectModal";
 import { registerPlugin } from "@/lib/pluginRegistry";
 import { hooksForKeyboard } from "@/lib/pluginRegistry";
 import { buildContext } from "@/lib/buildContext";
@@ -40,6 +40,12 @@ function ConfirmPortal() {
   );
 }
 
+function ConnectPortal() {
+  const { activeModal, closeModal } = useUIStore();
+  if (activeModal !== "connect") return null;
+  return <ConnectModal onClose={closeModal} />;
+}
+
 export default function App() {
   const { user, setUser, sidebarWidth, setSidebarWidth } = useUIStore();
   const [authChecked, setAuthChecked] = useState(false);
@@ -62,6 +68,11 @@ export default function App() {
         setUser(u);
         if (u) {
           await useWorkspaceStore.getState().load();
+          if (useWorkspaceStore.getState().workspaces.length === 0) {
+            // First run with no workspaces — bootstrap a Default workspace.
+            await useWorkspaceStore.getState().createWorkspace("Default");
+            await useWorkspaceStore.getState().load();
+          }
           void useTreeStore.getState().reload();
           void useDraftStore.getState().initializeDraftPaths();
         }
@@ -139,6 +150,7 @@ export default function App() {
       <StatusBar />
       <ContextMenuPortal />
       <ConfirmPortal />
+      <ConnectPortal />
     </div>
   );
 }

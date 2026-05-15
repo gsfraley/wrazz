@@ -22,14 +22,14 @@ export interface OidcStatus {
 }
 
 export async function getOidcConfig(): Promise<OidcConfig> {
-  const resp = await apiFetch("/api/admin/oidc");
+  const resp = await apiFetch("/api/v1/admin/oidc");
   return resp.json();
 }
 
 export async function saveOidcConfig(
   config: Pick<OidcConfig, "issuer_url" | "client_id" | "client_secret" | "redirect_uri" | "enabled">
 ): Promise<OidcConfig> {
-  const resp = await apiFetch("/api/admin/oidc", {
+  const resp = await apiFetch("/api/v1/admin/oidc", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(config),
@@ -38,12 +38,12 @@ export async function saveOidcConfig(
 }
 
 export async function deleteOidcConfig(): Promise<void> {
-  await apiFetch("/api/admin/oidc", { method: "DELETE" });
+  await apiFetch("/api/v1/admin/oidc", { method: "DELETE" });
 }
 
 export async function getOidcStatus(): Promise<OidcStatus> {
   try {
-    const resp = await apiFetch("/api/auth/oidc/status");
+    const resp = await apiFetch("/api/v1/auth/oidc/status");
     return resp.json();
   } catch {
     return { enabled: false };
@@ -59,10 +59,10 @@ export interface AdminUser {
 }
 
 export async function listUsers(): Promise<AdminUser[]> {
-  const resp = await apiFetch("/api/admin/users");
+  const resp = await apiFetch("/api/v1/admin/users");
   return resp.json();
 }
 
 export async function deleteUser(id: string): Promise<void> {
-  await apiFetch(`/api/admin/users/${id}`, { method: "DELETE" });
+  await apiFetch(`/api/v1/admin/users/${id}`, { method: "DELETE" });
 }

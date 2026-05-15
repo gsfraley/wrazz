@@ -25,6 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let bind = std::env::var("WRAZZ_BIND").unwrap_or_else(|_| "127.0.0.1:3001".into());
     let static_dir = std::env::var("WRAZZ_STATIC_DIR").ok();
     let public_url = std::env::var("WRAZZ_PUBLIC_URL").ok();
+    let dev_frontend = std::env::var("WRAZZ_DEV_FRONTEND").ok();
     let session_hours: i64 = std::env::var("WRAZZ_SESSION_HOURS")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -63,6 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         oidc_provider,
         session_duration: chrono::Duration::hours(session_hours),
         public_url,
+        dev_frontend,
     };
 
     // Background task: expire sessions hourly.

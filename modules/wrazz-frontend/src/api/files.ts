@@ -23,7 +23,7 @@ export interface FileContent {
 }
 
 function wsBase(workspaceId: string): string {
-  return `/api/workspaces/${workspaceId}`;
+  return `/api/v1/workspaces/${workspaceId}`;
 }
 
 function pathToUrl(path: string): string {

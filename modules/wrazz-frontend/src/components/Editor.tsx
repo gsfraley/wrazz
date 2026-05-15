@@ -1,6 +1,7 @@
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUIStore } from "@/stores/uiStore";
 import { WrazzEditor } from "wrazz-editor";
+import WelcomePage from "@/components/WelcomePage";
 import { pathToDisplayTitle, cx } from "@/lib/utils";
 import styles from "@/components/Editor.module.css";
 
@@ -14,7 +15,7 @@ export default function Editor() {
         {isDirty && activeFile && <span className={styles.editorUnsavedMsg}>Unsaved changes</span>}
       </div>
       {!activeFile || !draft ? (
-        <div className={styles.editorEmpty}>Select a file or create a new one.</div>
+        <WelcomePage />
       ) : (
         <div className={styles.editorBody}>
           <div className={styles.editorTitleRow}>

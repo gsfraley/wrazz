@@ -80,8 +80,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const { workspaces, activeWorkspaceId } = get();
     const remaining = workspaces.filter((w) => w.id !== id);
     set({ workspaces: remaining });
-    if (activeWorkspaceId === id && remaining.length > 0) {
-      get().setActive(remaining[0].id);
+    if (activeWorkspaceId === id) {
+      if (remaining.length > 0) get().setActive(remaining[0].id);
+      else {
+        set({ activeWorkspaceId: null });
+        void import("@/stores/treeStore").then(({ useTreeStore }) => {
+          void useTreeStore.getState().reload();
+        });
+        void import("@/stores/documentStore").then(({ useDocumentStore }) => {
+          useDocumentStore.getState().closeFile();
+        });
+      }
     }
   },
 }));

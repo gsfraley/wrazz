@@ -4,7 +4,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::{delete, get, patch, post, put},
+    routing::{delete, get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -174,7 +174,7 @@ pub fn build_router(
     let cors = build_cors();
 
     Router::new()
-        .nest("/api", api)
+        .nest("/api/v1", api)
         .route("/connect/callback", get(crate::connect::connect_callback))
         .layer(cors)
         .with_state(state)

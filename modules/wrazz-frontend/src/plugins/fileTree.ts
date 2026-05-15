@@ -54,7 +54,7 @@ export const fileTreePlugin: Plugin = {
       icon: Download,
       group: "export",
       present: (_ctx, target) => target.kind === "file",
-      run: (_ctx, target) => { triggerDownload(`/api/export/file/${pathToUrl(target.path)}`); },
+      run: (_ctx, target) => { triggerDownload(`/api/v1/export/file/${pathToUrl(target.path)}`); },
     },
     {
       type: "contextMenu",
@@ -62,7 +62,7 @@ export const fileTreePlugin: Plugin = {
       icon: Download,
       group: "export",
       present: (_ctx, target) => target.kind === "dir" || target.kind === "root",
-      run: (_ctx, target) => { triggerDownload(`/api/export/dir/${pathToUrl(target.path)}`); },
+      run: (_ctx, target) => { triggerDownload(`/api/v1/export/dir/${pathToUrl(target.path)}`); },
     },
 
     // ── Delete (files and dirs, not root) ─────────────────────────────────────

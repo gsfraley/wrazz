@@ -2,10 +2,10 @@ use std::{collections::HashMap, sync::Arc, time::Instant};
 use axum::{
     extract::{Query, State},
     http::StatusCode,
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
 };
 use serde::Deserialize;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
 use wrazz_backend::RemoteWorkspaceConfig;
 
@@ -131,20 +131,10 @@ pub async fn connect_callback(
         }
     }
 
-    Html(
-        r#"<!DOCTYPE html>
-<html>
-<head><title>Connected</title></head>
-<body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-  <div style="text-align:center;">
-    <h2>Connected!</h2>
-    <p>You can close this window.</p>
-    <script>window.close();</script>
-  </div>
-</body>
-</html>"#,
-    )
-    .into_response()
+    if let Some(popup) = state.app_handle.get_webview_window("connect-popup") {
+        let _ = popup.close();
+    }
+    (StatusCode::OK, "Connected").into_response()
 }
 
 async fn fetch_all_workspaces(
@@ -152,7 +142,7 @@ async fn fetch_all_workspaces(
     server_url: &str,
     token: &str,
 ) -> Result<Vec<String>, String> {
-    let url = format!("{server_url}/api/workspaces");
+    let url = format!("{server_url}/api/v1/workspaces");
     let resp = client
         .get(&url)
         .header("Authorization", format!("Bearer {token}"))
@@ -176,7 +166,7 @@ async fn fetch_workspace_name(
     token: &str,
     workspace_id: &str,
 ) -> Result<String, String> {
-    let url = format!("{server_url}/api/workspaces/{workspace_id}");
+    let url = format!("{server_url}/api/v1/workspaces/{workspace_id}");
     let resp = client
         .get(&url)
         .header("Authorization", format!("Bearer {token}"))

@@ -29,7 +29,7 @@ export default function DesktopSettingsModal({ onClose }: DesktopSettingsModalPr
       const path: string | null = await invoke("pick_folder");
       if (!path) return;
       const name = path.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? path;
-      await apiFetch("/api/workspaces", {
+      await apiFetch("/api/v1/workspaces", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "local", path, name }),

@@ -27,4 +27,8 @@ pub struct AppState {
     pub oidc_provider: Arc<RwLock<Option<Arc<OidcProvider>>>>,
     pub session_duration: Duration,
     pub public_url: Option<String>,
+    /// Dev-mode frontend origin (e.g. `http://localhost:5173`).
+    /// When set, `/api/connect` redirects to this origin's `/connect` page
+    /// instead of the same-origin `/connect` path used in production.
+    pub dev_frontend: Option<String>,
 }

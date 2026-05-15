@@ -22,7 +22,7 @@ interface UIState {
   user: CurrentUser | null;
 
   // Modals
-  activeModal: "profile" | "admin" | "desktop-settings" | null;
+  activeModal: "profile" | "admin" | "desktop-settings" | "connect" | null;
 
   // Inline rename trigger (set by plugin/tree ops; consumed by useFileTreeOperations)
   inlineEditPath: string | null;
@@ -44,7 +44,7 @@ interface UIState {
   ) => void;
   closeCtxMenu: () => void;
   setUser: (user: CurrentUser | null) => void;
-  openModal: (id: "profile" | "admin" | "desktop-settings") => void;
+  openModal: (id: "profile" | "admin" | "desktop-settings" | "connect") => void;
   closeModal: () => void;
   setInlineEditPath: (path: string | null) => void;
   setPaletteOpen: (open: boolean) => void;

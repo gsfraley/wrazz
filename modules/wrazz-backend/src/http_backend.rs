@@ -25,7 +25,7 @@ impl HttpBackend {
     }
 
     fn workspace_base(&self, workspace: &str) -> String {
-        format!("{}/api/workspaces/{}", self.base_url, workspace)
+        format!("{}/api/v1/workspaces/{}", self.base_url, workspace)
     }
 
     fn url_path(path: &str) -> &str {

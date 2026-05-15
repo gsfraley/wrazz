@@ -1,7 +1,7 @@
 //! API token management endpoints.
 //!
 //! Routes:
-//! - `GET  /api/connect`    — OAuth-style approval page (session auth)
+//! - `GET  /api/connect`    — redirect to frontend connect/approve page
 //! - `POST /api/connect`    — approve and issue a token (session auth)
 //! - `GET  /api/tokens`     — list tokens for the current user (session auth)
 //! - `DELETE /api/tokens/{id}` — delete a token (session auth)
@@ -10,8 +10,8 @@ use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use axum::{
     Json,
     extract::{Path, Query, State},
-    http::{StatusCode, header},
-    response::{IntoResponse, Response},
+    http::StatusCode,
+    response::{IntoResponse, Redirect, Response},
 };
 use axum_extra::extract::cookie::CookieJar;
 use chrono::{DateTime, Utc};
@@ -51,6 +51,11 @@ pub struct ConnectForm {
 // ---------------------------------------------------------------------------
 // Token list response (never includes token_hash)
 // ---------------------------------------------------------------------------
+
+#[derive(Serialize)]
+struct ConnectResult {
+    callback_url: String,
+}
 
 #[derive(Serialize)]
 pub struct TokenSummary {
@@ -126,15 +131,13 @@ async fn session_user_only(
 }
 
 // ---------------------------------------------------------------------------
-// GET /api/connect — approval page
+// GET /api/connect — redirect to the frontend connect/approve page
 // ---------------------------------------------------------------------------
 
 pub async fn connect_approval_page(
     State(state): State<AppState>,
     Query(params): Query<ConnectQuery>,
-    jar: CookieJar,
 ) -> Response {
-    // Validate redirect_uri before showing anything.
     if !validate_redirect_uri(&params.redirect_uri) {
         return (
             StatusCode::BAD_REQUEST,
@@ -143,142 +146,23 @@ pub async fn connect_approval_page(
             .into_response();
     }
 
-    let user = match session_user_only(&jar, &state.pool).await {
-        Some(u) => u,
-        None => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-                r#"<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>Login required</title></head>
-<body>
-<h2>Login required</h2>
-<p>You must be logged in to authorize wrazz Desktop.</p>
-<p><a href="/">Go to login</a></p>
-</body></html>"#,
-            )
-                .into_response();
-        }
-    };
-
-    // Fetch workspaces so we can render checkboxes.
-    let workspaces = match db::list_workspaces(&state.pool, user.id).await {
-        Ok(ws) => ws,
-        Err(_) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, "database error").into_response();
-        }
-    };
-
-    // Pre-selected workspace IDs from query param.
-    let pre_selected: Vec<&str> = if params.workspaces.is_empty() {
-        vec![]
-    } else {
-        params.workspaces.split(',').collect()
-    };
-    let all_pre_selected = pre_selected.is_empty();
-
-    let mut workspace_checkboxes = String::new();
-    for ws in &workspaces {
-        let checked = if all_pre_selected || pre_selected.contains(&ws.id.as_str()) {
-            " checked"
-        } else {
-            ""
-        };
-        workspace_checkboxes.push_str(&format!(
-            r#"<label><input type="checkbox" name="ws_{id}" value="{id}"{checked}> {name}</label><br>"#,
-            id = html_escape(&ws.id),
-            name = html_escape(&ws.name),
-        ));
-    }
-
-    let name_escaped = html_escape(&params.name);
-    let redirect_escaped = html_escape(&params.redirect_uri);
-    let state_escaped = html_escape(&params.state);
-    let deny_url = format!(
-        "{}?error=access_denied&state={}",
-        params.redirect_uri,
-        url_encode(&params.state)
+    let query = format!(
+        "name={}&redirect_uri={}&state={}&workspaces={}",
+        url_encode(&params.name),
+        url_encode(&params.redirect_uri),
+        url_encode(&params.state),
+        url_encode(&params.workspaces),
     );
 
-    let html = format!(
-        r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Authorize wrazz Desktop</title>
-  <style>
-    body {{ font-family: system-ui, sans-serif; max-width: 480px; margin: 80px auto; padding: 0 1rem; }}
-    h2 {{ margin-bottom: 0.25rem; }}
-    .hint {{ color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }}
-    fieldset {{ border: 1px solid #ccc; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1.5rem; }}
-    legend {{ font-weight: 600; padding: 0 0.25rem; }}
-    label {{ display: block; margin: 0.35rem 0; }}
-    .actions {{ display: flex; gap: 0.75rem; }}
-    button {{ padding: 0.5rem 1.25rem; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; font-size: 1rem; }}
-    .primary {{ background: #0066cc; color: #fff; border-color: #0066cc; }}
-    .primary:hover {{ background: #0055aa; }}
-  </style>
-</head>
-<body>
-  <h2>Authorize wrazz Desktop</h2>
-  <p class="hint">
-    <strong>{name_escaped}</strong> is requesting access to your workspaces.<br>
-    Logged in as: <strong>{display_name}</strong>
-  </p>
+    // In dev mode, the frontend is served by Vite on a different port, so we
+    // redirect to the configured dev origin.  In production the static file
+    // fallback serves /connect from the same origin.
+    let location = match &state.dev_frontend {
+        Some(dev) => format!("{dev}/connect?{query}"),
+        None => format!("/connect?{query}"),
+    };
 
-  <form method="post" action="/api/connect">
-    <input type="hidden" name="redirect_uri" value="{redirect_escaped}">
-    <input type="hidden" name="state" value="{state_escaped}">
-    <input type="hidden" name="name" value="{name_escaped}">
-
-    <fieldset>
-      <legend>Workspace access</legend>
-      <label><input type="checkbox" id="all_ws" onchange="toggleAll(this)"> All workspaces (recommended)</label>
-      <hr style="border:none;border-top:1px solid #eee;margin:0.5rem 0">
-      {workspace_checkboxes}
-    </fieldset>
-
-    <div class="actions">
-      <button type="submit" class="primary" onclick="collectWorkspaces(event)">Authorize</button>
-      <a href="{deny_url}"><button type="button">Deny</button></a>
-    </div>
-
-    <input type="hidden" name="workspaces" id="workspaces_hidden">
-  </form>
-
-  <script>
-    function toggleAll(cb) {{
-      document.querySelectorAll('input[name^="ws_"]').forEach(el => el.disabled = cb.checked);
-    }}
-    function collectWorkspaces(e) {{
-      const allCb = document.getElementById('all_ws');
-      if (allCb.checked) {{
-        document.getElementById('workspaces_hidden').value = '*';
-        return;
-      }}
-      const ids = [];
-      document.querySelectorAll('input[name^="ws_"]:checked').forEach(el => ids.push(el.value));
-      document.getElementById('workspaces_hidden').value = ids.join(',');
-    }}
-    // Initialise: if no individual workspaces pre-checked, tick "All".
-    document.getElementById('all_ws').click();
-  </script>
-</body>
-</html>"#,
-        name_escaped = name_escaped,
-        display_name = html_escape(&user.display_name),
-        redirect_escaped = redirect_escaped,
-        state_escaped = state_escaped,
-        workspace_checkboxes = workspace_checkboxes,
-        deny_url = deny_url,
-    );
-
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        html,
-    )
-        .into_response()
+    Redirect::to(&location).into_response()
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +213,7 @@ pub async fn connect_submit(
         url_encode(&workspace_param),
     );
 
-    axum::response::Redirect::to(&redirect_url).into_response()
+    Json(ConnectResult { callback_url: redirect_url }).into_response()
 }
 
 // ---------------------------------------------------------------------------
@@ -393,19 +277,10 @@ pub async fn delete_token(
 }
 
 // ---------------------------------------------------------------------------
-// Tiny HTML/URL escaping helpers — avoids pulling in a template engine
+// URL encoding helper — avoids pulling in a template engine
 // ---------------------------------------------------------------------------
 
-fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
-}
-
 fn url_encode(s: &str) -> String {
-    // Percent-encode everything except unreserved chars (RFC 3986).
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {

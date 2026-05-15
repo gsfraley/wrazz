@@ -25,7 +25,7 @@ pub async fn begin_connect(
     rand::thread_rng().fill_bytes(&mut bytes);
     let nonce = hex::encode(bytes);
 
-    // Register the pending connect nonce.
+    let api_port = state.api_port;
     state.connect_state.pending.write().await.insert(
         nonce.clone(),
         crate::connect::PendingConnect {
@@ -35,27 +35,33 @@ pub async fn begin_connect(
         },
     );
 
-    let redirect_uri = format!("http://127.0.0.1:{}/connect/callback", state.api_port);
+    let redirect_uri = format!("http://127.0.0.1:{api_port}/connect/callback");
     let connect_url = format!(
-        "{}/api/connect?name={}&redirect_uri={}&state={}",
+        "{}/api/v1/connect?name={}&redirect_uri={}&state={}",
         server_url.trim_end_matches('/'),
         urlencoding::encode(&name),
         urlencoding::encode(&redirect_uri),
         nonce,
     );
 
-    // Open a popup WebviewWindow for the user to authorize.
-    tauri::WebviewWindowBuilder::new(
-        &app,
-        "connect-popup",
-        tauri::WebviewUrl::External(
-            connect_url.parse::<url::Url>().map_err(|e| e.to_string())?,
-        ),
-    )
-    .title("Authorize wrazz Desktop")
-    .inner_size(600.0, 700.0)
-    .build()
+    let url = connect_url.parse::<url::Url>().map_err(|e| e.to_string())?;
+
+    let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+    let app_clone = app.clone();
+    app.run_on_main_thread(move || {
+        let result = tauri::WebviewWindowBuilder::new(
+            &app_clone,
+            "connect-popup",
+            tauri::WebviewUrl::External(url),
+        )
+        .title("Authorize wrazz Desktop")
+        .inner_size(600.0, 700.0)
+        .build()
+        .map(|_| ())
+        .map_err(|e| e.to_string());
+        tx.send(result).ok();
+    })
     .map_err(|e| e.to_string())?;
 
-    Ok(())
+    rx.recv().unwrap_or_else(|_| Err("channel error".to_string()))
 }

@@ -1,12 +1,12 @@
 declare global {
   interface Window {
-    __TAURI__?: unknown;
+    __TAURI_INTERNALS__?: unknown;
     __WRAZZ_API_PORT__?: number;
   }
 }
 
 export function isDesktop(): boolean {
-  return typeof window !== "undefined" && window.__TAURI__ != null;
+  return typeof window !== "undefined" && window.__TAURI_INTERNALS__ != null;
 }
 
 /** Base URL prefix for API calls.

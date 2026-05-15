@@ -1,0 +1,1 @@
+{"main":{"identifier":"main","description":"Permissions for the main wrazz window","local":true,"windows":["main"],"permissions":["core:default","core:event:allow-listen","core:event:allow-emit","dialog:default"]}}

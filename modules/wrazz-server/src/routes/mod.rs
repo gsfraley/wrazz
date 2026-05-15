@@ -107,7 +107,7 @@ pub fn router(state: AppState, static_dir: Option<String>) -> Router {
         .merge(workspace_routes);
 
     let base = Router::new()
-        .nest("/api", api)
+        .nest("/api/v1", api)
         .layer(CorsLayer::permissive())
         .with_state(state);
 

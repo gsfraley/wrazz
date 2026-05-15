@@ -7,6 +7,7 @@ pub mod workspace_manager;
 
 use std::sync::Arc;
 use state::AppState;
+use tauri::Manager;
 
 pub fn run() {
     tauri::Builder::default()

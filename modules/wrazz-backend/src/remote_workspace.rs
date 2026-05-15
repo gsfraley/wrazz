@@ -71,7 +71,7 @@ impl RemoteWorkspace {
     /// Returns the base URL for all workspace endpoints:
     /// `{server_url}/api/workspaces/{id}`.
     fn workspace_base(&self) -> String {
-        format!("{}/api/workspaces/{}", self.config.server_url, self.config.id)
+        format!("{}/api/v1/workspaces/{}", self.config.server_url, self.config.id)
     }
 
     /// Strips a leading `/` from `path` so it can be appended to a URL

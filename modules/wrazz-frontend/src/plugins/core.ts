@@ -46,7 +46,7 @@ export const corePlugin: Plugin = {
       present: (ctx) => ctx.editor.activeFile !== null,
       run: (ctx) => {
         const path = ctx.editor.activeFile?.path;
-        if (path) triggerDownload(`/api/export/file/${path.replace(/^\/|\/$/g, "")}`);
+        if (path) triggerDownload(`/api/v1/export/file/${path.replace(/^\/|\/$/g, "")}`);
       },
     },
     {
@@ -74,7 +74,7 @@ export const corePlugin: Plugin = {
       icon: Download,
       group: "WORKSPACE",
       present: () => true,
-      run: () => { triggerDownload("/api/export/dir"); },
+      run: () => { triggerDownload("/api/v1/export/dir"); },
     },
   ],
 };

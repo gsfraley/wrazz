@@ -42,6 +42,9 @@ struct PendingAuth {
     nonce: Nonce,
     pkce_verifier: PkceCodeVerifier,
     created_at: Instant,
+    /// Optional URL to redirect to after successful login (stored server-side
+    /// to prevent open-redirect: only validated origins are honoured).
+    next: Option<String>,
 }
 
 /// Holds the configured OIDC client and in-flight authorization state.
@@ -95,6 +98,14 @@ impl OidcProvider {
 }
 
 #[derive(Deserialize)]
+pub struct OidcRedirectParams {
+    /// After a successful login, redirect here instead of `/`.
+    /// Must be a relative path or start with an approved origin.
+    #[serde(default)]
+    pub next: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct CallbackParams {
     code: String,
     state: String,
@@ -119,6 +130,7 @@ pub async fn oidc_status(State(state): State<AppState>) -> Json<OidcStatusRespon
 /// provider's authorization endpoint.
 pub async fn oidc_redirect(
     State(state): State<AppState>,
+    Query(params): Query<OidcRedirectParams>,
 ) -> Result<Redirect, (StatusCode, &'static str)> {
     let provider = {
         let guard = state.oidc_provider.read().await;
@@ -139,6 +151,9 @@ pub async fn oidc_redirect(
         .set_pkce_challenge(pkce_challenge)
         .url();
 
+    // Validate `next` before storing — only allow relative paths or approved origins.
+    let safe_next = params.next.filter(|url| is_safe_redirect(url, &state));
+
     let mut pending = provider.pending.write().await;
     OidcProvider::evict_stale(&mut pending);
     pending.insert(
@@ -147,10 +162,30 @@ pub async fn oidc_redirect(
             nonce,
             pkce_verifier,
             created_at: Instant::now(),
+            next: safe_next,
         },
     );
 
     Ok(Redirect::to(auth_url.as_str()))
+}
+
+/// Returns true if `url` is a safe post-login redirect destination.
+/// Relative paths are always allowed; absolute URLs must match a known origin.
+fn is_safe_redirect(url: &str, state: &AppState) -> bool {
+    if url.starts_with('/') {
+        return true;
+    }
+    if let Some(ref dev) = state.dev_frontend {
+        if url.starts_with(dev.as_str()) {
+            return true;
+        }
+    }
+    if let Some(ref pub_url) = state.public_url {
+        if url.starts_with(pub_url.as_str()) {
+            return true;
+        }
+    }
+    false
 }
 
 /// `GET /api/auth/oidc/callback` — completes the authorization code flow.
@@ -249,5 +284,6 @@ pub async fn oidc_callback(
         .path("/")
         .build();
 
-    Ok((jar.add(cookie), Redirect::to("/")))
+    let redirect_to = pending.next.as_deref().unwrap_or("/");
+    Ok((jar.add(cookie), Redirect::to(redirect_to)))
 }
