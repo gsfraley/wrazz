@@ -1,5 +1,5 @@
 use tauri::{command, AppHandle, State};
-use crate::state::AppState;
+use crate::{desktop_prefs, state::AppState};
 
 #[command]
 pub fn get_api_port(state: State<AppState>) -> u16 {
@@ -64,4 +64,22 @@ pub async fn begin_connect(
     .map_err(|e| e.to_string())?;
 
     rx.recv().unwrap_or_else(|_| Err("channel error".to_string()))
+}
+
+#[command]
+pub fn get_desktop_prefs(state: State<AppState>) -> desktop_prefs::DesktopPrefs {
+    let overrides = state.desktop_overrides.read().unwrap();
+    desktop_prefs::compute_prefs(&state.detected_button_side, &overrides)
+}
+
+#[command]
+pub fn set_desktop_pref_overrides(
+    state: State<AppState>,
+    button_side: Option<String>,
+) -> Result<desktop_prefs::DesktopPrefs, String> {
+    let new_overrides = desktop_prefs::DesktopPrefOverrides { button_side };
+    desktop_prefs::save_overrides(&state.desktop_prefs_path, &new_overrides)?;
+    let mut lock = state.desktop_overrides.write().map_err(|_| "lock poisoned".to_string())?;
+    *lock = new_overrides;
+    Ok(desktop_prefs::compute_prefs(&state.detected_button_side, &lock))
 }

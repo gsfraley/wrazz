@@ -180,3 +180,42 @@
   color: var(--danger);
   margin: 0;
 }
+
+/* ── Appearance preference rows ── */
+.prefRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.prefLabel {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink);
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
+.prefSelect {
+  appearance: auto;
+  padding: 4px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.prefSelect:focus {
+  border-color: var(--ink-muted);
+}
+
+.prefHint {
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  margin: 0;
+}

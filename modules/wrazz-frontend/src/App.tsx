@@ -13,12 +13,14 @@ import LoginPage from "@/components/LoginPage";
 import ContextMenu from "@/components/ContextMenu";
 import ConfirmModal from "@/components/modals/ConfirmModal";
 import ConnectModal from "@/components/modals/ConnectModal";
+import DesktopSettingsModal from "@/components/modals/DesktopSettingsModal";
 import { registerPlugin } from "@/lib/pluginRegistry";
 import { hooksForKeyboard } from "@/lib/pluginRegistry";
 import { buildContext } from "@/lib/buildContext";
 import { corePlugin } from "@/plugins/core";
 import { accountPlugin } from "@/plugins/account";
 import { fileTreePlugin } from "@/plugins/fileTree";
+import type { DesktopPrefs } from "@/types";
 import styles from "@/App.module.css";
 
 function ContextMenuPortal() {
@@ -46,6 +48,12 @@ function ConnectPortal() {
   return <ConnectModal onClose={closeModal} />;
 }
 
+function DesktopSettingsPortal() {
+  const { activeModal, closeModal } = useUIStore();
+  if (activeModal !== "desktop-settings") return null;
+  return <DesktopSettingsModal onClose={closeModal} />;
+}
+
 export default function App() {
   const { user, setUser, sidebarWidth, setSidebarWidth } = useUIStore();
   const [authChecked, setAuthChecked] = useState(false);
@@ -59,6 +67,14 @@ export default function App() {
         void useTreeStore.getState().reload();
         void useDraftStore.getState().initializeDraftPaths();
       });
+      // Fetch detected desktop preferences (button side etc.).
+      import("@tauri-apps/api/core").then(({ invoke }) => {
+        invoke<DesktopPrefs>("get_desktop_prefs")
+          .then((prefs) => useUIStore.getState().setDesktopPrefs(prefs))
+          .catch(() => {});
+      });
+      // Rounded corners: set immediately for non-maximized start, then track changes.
+      document.documentElement.style.setProperty("--window-radius", "8px");
       setAuthChecked(true);
       return;
     }
@@ -87,6 +103,21 @@ export default function App() {
       registerPlugin(fileTreePlugin),
     ];
     return () => unregs.forEach((f) => f());
+  }, []);
+
+  // Track maximized state to toggle rounded corners.
+  useEffect(() => {
+    if (!isDesktop()) return;
+    let unlisten: (() => void) | undefined;
+    import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
+      const win = getCurrentWindow();
+      const applyCorners = (max: boolean) => {
+        document.documentElement.style.setProperty("--window-radius", max ? "0px" : "8px");
+      };
+      void win.isMaximized().then(applyCorners);
+      void win.onResized(() => { void win.isMaximized().then(applyCorners); }).then((u) => { unlisten = u; });
+    });
+    return () => { unlisten?.(); };
   }, []);
 
   useEffect(() => {
@@ -151,6 +182,7 @@ export default function App() {
       <ContextMenuPortal />
       <ConfirmPortal />
       <ConnectPortal />
+      <DesktopSettingsPortal />
     </div>
   );
 }

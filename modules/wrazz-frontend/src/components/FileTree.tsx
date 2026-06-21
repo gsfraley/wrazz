@@ -7,9 +7,11 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useFileTreeOperations } from "@/components/tree/useFileTreeOperations";
 import FileRow from "@/components/tree/FileRow";
 import DirRow from "@/components/tree/DirRow";
+import WindowControls from "@/components/WindowControls";
 import { Menu, Check, Plus, ChevronDown, HardDrive, Server, Link, Trash2 } from "@/icons";
 import { cx } from "@/lib/utils";
 import { isDesktop } from "@/lib/api";
+import { useWindowDrag } from "@/lib/windowDrag";
 import { apiFetch } from "@/lib/apiError";
 import { buildContext, buildTargetForPath } from "@/lib/buildContext";
 import { hooksForContextMenu, contextMenuItems } from "@/lib/pluginRegistry";
@@ -38,9 +40,11 @@ export default function FileTree({ width }: FileTreeProps) {
   const { root, expanded, children, toggleDir } = useTreeStore();
   const { activePath } = useDocumentStore();
   const { draftPaths } = useDraftStore();
-  const { setActiveCtx, openCtxMenu, openModal } = useUIStore();
+  const { setActiveCtx, openCtxMenu, openModal, desktopPrefs } = useUIStore();
   const { workspaces, activeWorkspaceId, setActive, createWorkspace, deleteWorkspace, load } = useWorkspaceStore();
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+  const onDragDown = useWindowDrag();
+  const showLeftControls = isDesktop() && desktopPrefs?.buttonSide === "left";
 
   const ops = useFileTreeOperations();
   const [dragPath, setDragPath] = useState<string | null>(null);
@@ -207,7 +211,8 @@ export default function FileTree({ width }: FileTreeProps) {
 
   return (
     <aside className={styles.sidebar} style={{ width }} onClick={() => setActiveCtx("fileTree")}>
-      <div className={styles.sidebarHeader} ref={pickerRef}>
+      <div className={styles.sidebarHeader} ref={pickerRef} onMouseDown={onDragDown}>
+        {showLeftControls && <WindowControls side="left" />}
         <button
           className={styles.workspaceBtn}
           onClick={() => setPickerOpen((o) => !o)}
@@ -222,6 +227,7 @@ export default function FileTree({ width }: FileTreeProps) {
           <button
             className={styles.sidebarMenuBtn}
             onClick={(e) => openMenuForPath(e, "/")}
+            onMouseDown={(e) => e.stopPropagation()}
             aria-label="Workspace menu"
           >
             <Menu size={14} />

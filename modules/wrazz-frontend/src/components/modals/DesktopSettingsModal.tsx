@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import Modal from "@/components/modals/Modal";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useUIStore } from "@/stores/uiStore";
 import { apiFetch } from "@/lib/apiError";
 import { HardDrive, Server, Plus, Trash2, Link } from "@/icons";
 import type { WorkspaceSummary } from "@/api/workspaces";
+import type { DesktopPrefs } from "@/types";
 import styles from "@/components/modals/DesktopSettingsModal.module.css";
 
 export interface DesktopSettingsModalProps {
@@ -12,11 +14,22 @@ export interface DesktopSettingsModalProps {
 
 export default function DesktopSettingsModal({ onClose }: DesktopSettingsModalProps) {
   const { workspaces, load, deleteWorkspace } = useWorkspaceStore();
+  const { desktopPrefs, setDesktopPrefs } = useUIStore();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectUrl, setConnectUrl] = useState("");
   const [connecting, setConnecting] = useState(false);
   const unlistenRef = useRef<(() => void) | null>(null);
+
+  async function handleButtonSideChange(side: "left" | "right" | null) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const prefs = await invoke<DesktopPrefs>("set_desktop_pref_overrides", { button_side: side });
+      setDesktopPrefs(prefs);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save preference.");
+    }
+  }
 
   // Clean up any dangling event listener when the modal unmounts.
   useEffect(() => () => { unlistenRef.current?.(); }, []);
@@ -82,8 +95,35 @@ export default function DesktopSettingsModal({ onClose }: DesktopSettingsModalPr
   const remoteWorkspaces = workspaces.filter((w) => w.kind === "remote");
 
   return (
-    <Modal title="Workspaces" onClose={onClose} narrow>
+    <Modal title="Desktop Settings" onClose={onClose} narrow>
       <div className={styles.body}>
+
+        {/* ── Appearance ───────────────────────────────────────────── */}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionTitle}>Appearance</span>
+          </div>
+          <div className={styles.prefRow}>
+            <span className={styles.prefLabel}>Window controls</span>
+            <select
+              className={styles.prefSelect}
+              value={desktopPrefs?.overrides.buttonSide ?? "auto"}
+              onChange={(e) => {
+                const v = e.target.value;
+                void handleButtonSideChange(v === "auto" ? null : (v as "left" | "right"));
+              }}
+            >
+              <option value="auto">Auto</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+          {desktopPrefs && (
+            <p className={styles.prefHint}>
+              Detected: {desktopPrefs.detected.side} ({desktopPrefs.detected.source})
+            </p>
+          )}
+        </section>
 
         {/* ── Local workspaces ─────────────────────────────────────── */}
         <section className={styles.section}>

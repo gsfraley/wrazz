@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod connect;
+pub mod desktop_prefs;
 pub mod server;
 pub mod state;
 pub mod workspace_config;
@@ -40,6 +41,18 @@ pub fn run() {
                 .expect("failed to bind embedded server");
             let port = listener.local_addr().unwrap().port();
 
+            // Load desktop preferences (button-side detection + any saved overrides).
+            let desktop_prefs_path = Arc::new(
+                app.path()
+                    .app_data_dir()
+                    .expect("no app data dir")
+                    .join("desktop_prefs.json"),
+            );
+            let desktop_overrides = Arc::new(std::sync::RwLock::new(
+                desktop_prefs::load_overrides(&desktop_prefs_path),
+            ));
+            let detected_button_side = Arc::new(desktop_prefs::detect_button_side());
+
             // Build connect state for tracking RFC 8252 nonces.
             let connect_state = Arc::new(connect::ConnectState::new());
 
@@ -67,6 +80,9 @@ pub fn run() {
                 config_path: Arc::clone(&config_path),
                 connect_state: Arc::clone(&connect_state),
                 _runtime: Arc::new(rt),
+                desktop_prefs_path: Arc::clone(&desktop_prefs_path),
+                desktop_overrides: Arc::clone(&desktop_overrides),
+                detected_button_side: Arc::clone(&detected_button_side),
             });
 
             Ok(())
@@ -75,6 +91,8 @@ pub fn run() {
             commands::get_api_port,
             commands::pick_folder,
             commands::begin_connect,
+            commands::get_desktop_prefs,
+            commands::set_desktop_pref_overrides,
         ])
         .run(tauri::generate_context!())
         .expect("error while running wrazz desktop");

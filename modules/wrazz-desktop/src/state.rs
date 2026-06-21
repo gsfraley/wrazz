@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
 use wrazz_backend::WorkspaceRegistry;
-use crate::{connect::ConnectState, workspace_config::WorkspaceConfig};
+use crate::{connect::ConnectState, desktop_prefs::{DesktopPrefOverrides, DetectedButtonSide}, workspace_config::WorkspaceConfig};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -12,4 +12,7 @@ pub struct AppState {
     pub connect_state: Arc<ConnectState>,
     /// Keeps the dedicated tokio Runtime alive for the duration of the app.
     pub _runtime: Arc<tokio::runtime::Runtime>,
+    pub desktop_prefs_path: Arc<PathBuf>,
+    pub desktop_overrides: Arc<std::sync::RwLock<DesktopPrefOverrides>>,
+    pub detected_button_side: Arc<DetectedButtonSide>,
 }

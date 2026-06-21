@@ -1,6 +1,8 @@
 import type { Plugin } from "@/lib/plugin";
-import { Save, RotateCcw, FilePlus, FolderPlus, Download } from "@/icons";
+import { Save, RotateCcw, FilePlus, FolderPlus, Download, Settings } from "@/icons";
 import { triggerDownload } from "@/lib/triggerDownload";
+import { isDesktop } from "@/lib/api";
+import { useUIStore } from "@/stores/uiStore";
 
 export const corePlugin: Plugin = {
   id: "core",
@@ -75,6 +77,15 @@ export const corePlugin: Plugin = {
       group: "WORKSPACE",
       present: () => true,
       run: () => { triggerDownload("/api/v1/export/dir"); },
+    },
+    {
+      type: "command",
+      label: "Desktop settings",
+      keywords: ["settings", "preferences", "appearance", "window", "decorations"],
+      icon: Settings,
+      group: "DESKTOP",
+      present: () => isDesktop(),
+      run: () => { useUIStore.getState().openModal("desktop-settings"); },
     },
   ],
 };

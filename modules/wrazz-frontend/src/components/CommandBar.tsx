@@ -8,10 +8,12 @@ import { hooksForPalette } from "@/lib/pluginRegistry";
 import { buildContext } from "@/lib/buildContext";
 import { triggerDownload } from "@/lib/triggerDownload";
 import { pathToDisplayTitle, cx } from "@/lib/utils";
+import { useWindowDrag } from "@/lib/windowDrag";
 import type { Hook } from "@/lib/plugin";
 import type { ContextMenuItem } from "@/components/ContextMenu";
 import { Save, RotateCcw, Download, Search } from "@/icons";
 import { isDesktop } from "@/lib/api";
+import WindowControls from "@/components/WindowControls";
 import ProfileModal from "@/components/modals/ProfileModal";
 import AdminModal from "@/components/modals/AdminModal";
 import CommandPalette from "@/components/CommandPalette";
@@ -40,8 +42,10 @@ export default function CommandBar() {
   const [selected, setSelected] = useState(0);
   const [allFiles, setAllFiles] = useState<FileSummary[]>([]);
   const [dropdownPos, setDropdownPos] = useState<DropdownPos | null>(null);
+  const onDragDown = useWindowDrag();
 
-  const { user, activeModal, openModal, closeModal, openCtxMenu, paletteOpen: open, setPaletteOpen } = useUIStore();
+  const { user, activeModal, openModal, closeModal, openCtxMenu, paletteOpen: open, setPaletteOpen, desktopPrefs } = useUIStore();
+  const showRightControls = isDesktop() && desktopPrefs?.buttonSide === "right";
   const { activePath, isDirty, draft, activeFile } = useDocumentStore();
   const hasActiveFile = activeFile !== null;
   const editorTitle = draft?.title || (activePath ? pathToDisplayTitle(activePath) : null);
@@ -156,7 +160,7 @@ export default function CommandBar() {
 
   return (
     <>
-      <div className={cx(styles.commandBar, open && styles.isOpen)}>
+      <div className={cx(styles.commandBar, open && styles.isOpen, showRightControls && styles.rightControlsActive)} onMouseDown={onDragDown}>
         <div className={cx(styles.commandInputWrap, open && styles.isOpen)} ref={inputWrapRef}>
           <Search size={14} className={styles.commandInputSearchIcon} />
           <input
@@ -164,7 +168,7 @@ export default function CommandBar() {
             className={cx(styles.commandInput, open && styles.isOpen)}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => { if (!open) openPalette(); }}
+            onClick={() => { if (!open) openPalette(); }}
             onKeyDown={handleInputKeyDown}
             placeholder={open ? "Search or run a command…" : (editorTitle || "Search or run a command…")}
             tabIndex={-1}
@@ -192,11 +196,13 @@ export default function CommandBar() {
             <button
               className={styles.userMenuTrigger}
               onClick={(e) => openCtxMenu(e, userMenuItems(), "top-to-element-bottom", "right-to-element-right")}
+              onMouseDown={(e) => e.stopPropagation()}
             >
               {user?.display_name}
             </button>
           </div>
         )}
+        {showRightControls && <WindowControls side="right" />}
       </div>
 
       {open && dropdownPos && (
