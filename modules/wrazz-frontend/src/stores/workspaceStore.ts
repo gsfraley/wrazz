@@ -7,9 +7,15 @@ import {
   type WorkspaceSummary,
 } from "@/api/workspaces";
 import { useUIStore } from "@/stores/uiStore";
+import { isDesktop } from "@/lib/api";
 
 function storageKey(userId: string) {
   return `wrazz.active_workspace.${userId}`;
+}
+
+function currentUserId(): string | null {
+  if (isDesktop()) return "__desktop__";
+  return useUIStore.getState().user?.id ?? null;
 }
 
 interface WorkspaceState {
@@ -33,7 +39,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     if (workspaces.length === 0) return;
 
-    const userId = useUIStore.getState().user?.id;
+    const userId = currentUserId();
     const stored = userId ? localStorage.getItem(storageKey(userId)) : null;
     const valid = stored ? workspaces.find((w) => w.id === stored) : null;
     const active = valid ?? workspaces[0];
@@ -44,7 +50,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   setActive: (id) => {
     set({ activeWorkspaceId: id });
-    const userId = useUIStore.getState().user?.id;
+    const userId = currentUserId();
     if (userId) localStorage.setItem(storageKey(userId), id);
     // Reload tree and close current doc for the new workspace.
     // Imported lazily to avoid circular deps between stores.
@@ -74,8 +80,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const { workspaces, activeWorkspaceId } = get();
     const remaining = workspaces.filter((w) => w.id !== id);
     set({ workspaces: remaining });
-    if (activeWorkspaceId === id && remaining.length > 0) {
-      get().setActive(remaining[0].id);
+    if (activeWorkspaceId === id) {
+      if (remaining.length > 0) get().setActive(remaining[0].id);
+      else {
+        set({ activeWorkspaceId: null });
+        void import("@/stores/treeStore").then(({ useTreeStore }) => {
+          void useTreeStore.getState().reload();
+        });
+        void import("@/stores/documentStore").then(({ useDocumentStore }) => {
+          useDocumentStore.getState().closeFile();
+        });
+      }
     }
   },
 }));

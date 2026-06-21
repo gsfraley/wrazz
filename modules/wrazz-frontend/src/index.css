@@ -59,6 +59,7 @@
   --border-strong: #c8c0b0;
   --danger:        #a03030;
   --topbar-height: 60px;
+  --window-radius: 0px; /* set to 8px by App.tsx on desktop when not maximized */
 
   /* Bridge wrazz-editor custom properties to the app theme */
   --we-ink:       var(--ink);
@@ -73,10 +74,17 @@
   padding: 0;
 }
 
-html,
+html {
+  height: 100%;
+  border-radius: var(--window-radius);
+  overflow: hidden; /* clips content to rounded corners when window is not maximized */
+}
+
 body,
 #root {
   height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
 }
 
 body {

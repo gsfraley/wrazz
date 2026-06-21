@@ -15,11 +15,14 @@ export class ApiError extends Error {
   get isServerError(): boolean { return this.status >= 500; }
 }
 
+import { apiBase } from "@/lib/api";
+
 export async function apiFetch(
-  input: RequestInfo,
+  input: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const resp = await fetch(input, init);
+  const url = input.startsWith("/") ? `${apiBase()}${input}` : input;
+  const resp = await fetch(url, init);
   if (!resp.ok) {
     let body: unknown;
     try {

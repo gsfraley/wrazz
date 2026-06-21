@@ -7,11 +7,16 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useFileTreeOperations } from "@/components/tree/useFileTreeOperations";
 import FileRow from "@/components/tree/FileRow";
 import DirRow from "@/components/tree/DirRow";
-import { Menu, Check, Plus, ChevronDown } from "@/icons";
+import WindowControls from "@/components/WindowControls";
+import { Menu, Check, Plus, ChevronDown, HardDrive, Server, Link, Trash2 } from "@/icons";
 import { cx } from "@/lib/utils";
+import { isDesktop } from "@/lib/api";
+import { useWindowDrag } from "@/lib/windowDrag";
+import { apiFetch } from "@/lib/apiError";
 import { buildContext, buildTargetForPath } from "@/lib/buildContext";
 import { hooksForContextMenu, contextMenuItems } from "@/lib/pluginRegistry";
 import type { Entry } from "@/api/files";
+import type { WorkspaceSummary } from "@/api/workspaces";
 import type { DirEntry, RootEntry } from "@/lib/plugin";
 import styles from "@/components/FileTree.module.css";
 
@@ -35,9 +40,11 @@ export default function FileTree({ width }: FileTreeProps) {
   const { root, expanded, children, toggleDir } = useTreeStore();
   const { activePath } = useDocumentStore();
   const { draftPaths } = useDraftStore();
-  const { setActiveCtx, openCtxMenu } = useUIStore();
-  const { workspaces, activeWorkspaceId, setActive, createWorkspace } = useWorkspaceStore();
+  const { setActiveCtx, openCtxMenu, openModal, desktopPrefs } = useUIStore();
+  const { workspaces, activeWorkspaceId, setActive, createWorkspace, deleteWorkspace, load } = useWorkspaceStore();
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+  const onDragDown = useWindowDrag();
+  const showLeftControls = isDesktop() && desktopPrefs?.buttonSide === "left";
 
   const ops = useFileTreeOperations();
   const [dragPath, setDragPath] = useState<string | null>(null);
@@ -56,12 +63,40 @@ export default function FileTree({ width }: FileTreeProps) {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [pickerOpen]);
 
-  async function handleNewWorkspace() {
+  async function handleOpenLocalFolder() {
+    setPickerOpen(false);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const path: string | null = await invoke("pick_folder");
+      if (!path) return;
+      const name = path.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? path;
+      const resp = await apiFetch("/api/v1/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "local", path, name }),
+      });
+      const ws = await resp.json() as WorkspaceSummary;
+      await load();
+      setActive(ws.id);
+    } catch {
+      // silently ignore — the user cancelled the picker or there was an error
+    }
+  }
+
+  async function handleCreateWorkspace() {
     setPickerOpen(false);
     const name = window.prompt("Workspace name:");
     if (!name?.trim()) return;
     const ws = await createWorkspace(name.trim());
     setActive(ws.id);
+  }
+
+  async function handleRemoveWorkspace(ws: WorkspaceSummary) {
+    try {
+      await deleteWorkspace(ws.id);
+    } catch {
+      // ignore
+    }
   }
 
   // Scroll the active file into view whenever it changes or a directory expands to reveal it.
@@ -176,19 +211,23 @@ export default function FileTree({ width }: FileTreeProps) {
 
   return (
     <aside className={styles.sidebar} style={{ width }} onClick={() => setActiveCtx("fileTree")}>
-      <div className={styles.sidebarHeader} ref={pickerRef}>
+      <div className={styles.sidebarHeader} ref={pickerRef} onMouseDown={onDragDown}>
+        {showLeftControls && <WindowControls side="left" />}
         <button
           className={styles.workspaceBtn}
           onClick={() => setPickerOpen((o) => !o)}
           title="Switch workspace"
         >
-          <span className={styles.workspaceBtnLabel}>{activeWorkspace?.name ?? "Workspace"}</span>
+          <span className={cx(styles.workspaceBtnLabel, !activeWorkspace && styles.workspaceBtnLabelEmpty)}>
+            {activeWorkspace?.name ?? "— no workspace —"}
+          </span>
           <ChevronDown size={12} className={cx(styles.workspaceBtnChevron, pickerOpen && styles.workspaceBtnChevronOpen)} />
         </button>
         <div className={styles.sidebarMenu}>
           <button
             className={styles.sidebarMenuBtn}
             onClick={(e) => openMenuForPath(e, "/")}
+            onMouseDown={(e) => e.stopPropagation()}
             aria-label="Workspace menu"
           >
             <Menu size={14} />
@@ -197,24 +236,54 @@ export default function FileTree({ width }: FileTreeProps) {
         {pickerOpen && (
           <div className={styles.wsDropdown}>
             {workspaces.map((ws) => (
-              <button
+              <div
                 key={ws.id}
                 className={cx(styles.wsItem, ws.id === activeWorkspaceId && styles.wsItemActive)}
-                onClick={() => { setActive(ws.id); setPickerOpen(false); }}
               >
-                <span className={styles.wsItemCheck}>
-                  {ws.id === activeWorkspaceId && <Check size={12} />}
-                </span>
-                <span className={styles.wsItemName}>{ws.name}</span>
-              </button>
+                <button
+                  className={styles.wsItemMain}
+                  onClick={() => { setActive(ws.id); setPickerOpen(false); }}
+                >
+                  <span className={styles.wsItemIcon}>
+                    {ws.id === activeWorkspaceId
+                      ? <Check size={12} />
+                      : ws.kind === "remote"
+                        ? <Server size={12} />
+                        : <HardDrive size={12} />}
+                  </span>
+                  <span className={styles.wsItemName}>{ws.name}</span>
+                </button>
+                <button
+                  className={styles.wsItemRemove}
+                  onClick={() => void handleRemoveWorkspace(ws)}
+                  title="Remove workspace"
+                >
+                  <Trash2 size={11} />
+                </button>
+              </div>
             ))}
-            <button
-              className={cx(styles.wsItem, styles.wsItemNew)}
-              onClick={() => { void handleNewWorkspace(); }}
-            >
-              <span className={styles.wsItemCheck}><Plus size={12} /></span>
-              <span className={styles.wsItemName}>New workspace</span>
-            </button>
+            <div className={styles.wsActions}>
+              {isDesktop() ? (
+                <>
+                  <button className={styles.wsActionBtn} onClick={() => void handleOpenLocalFolder()}>
+                    <HardDrive size={12} />
+                    <span>Open local folder</span>
+                  </button>
+                  <button
+                    className={styles.wsActionBtn}
+                    onClick={() => { setPickerOpen(false); openModal("connect"); }}
+                  >
+                    <Link size={12} />
+                    <span>Connect to server</span>
+                  </button>
+                </>
+              ) : (
+                <button className={styles.wsActionBtn} onClick={() => void handleCreateWorkspace()}>
+                  <Plus size={12} />
+                  <span>Create workspace</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -7,11 +7,16 @@
   align-items: center;
   flex-shrink: 0;
   gap: 8px;
+  position: relative;
 }
 
 .commandBar.isOpen {
-  position: relative;
   z-index: 202;
+}
+
+/* Remove right padding so window controls sit flush with the edge */
+.commandBar.rightControlsActive {
+  padding-right: 0;
 }
 
 .commandInputWrap {

@@ -11,7 +11,7 @@ use axum::{Json, extract::{Path, State}, http::StatusCode};
 use serde::Deserialize;
 use wrazz_core::WorkspaceSummary;
 
-use super::auth::AuthUser;
+use super::auth::{AuthSource, AuthUser};
 use crate::{db, server_workspace, state::AppState};
 
 // --- Request bodies ---
@@ -32,10 +32,19 @@ pub async fn list_workspaces(
     State(state): State<AppState>,
     auth_user: AuthUser,
 ) -> Result<Json<Vec<WorkspaceSummary>>, (StatusCode, String)> {
-    db::list_workspaces(&state.pool, auth_user.0.id)
+    let mut workspaces = db::list_workspaces(&state.pool, auth_user.user.id)
         .await
-        .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // When authenticated via a token, filter to only workspaces in scope.
+    if let AuthSource::Token { scopes } = &auth_user.source {
+        workspaces.retain(|ws| {
+            let target = format!("workspace/{}", ws.id);
+            scopes.iter().any(|s| s == "workspace/*" || s == &target)
+        });
+    }
+
+    Ok(Json(workspaces))
 }
 
 pub async fn create_workspace(
@@ -48,7 +57,7 @@ pub async fn create_workspace(
         return Err((StatusCode::UNPROCESSABLE_ENTITY, "name must not be blank".into()));
     }
 
-    let summary = db::create_workspace(&state.pool, auth_user.0.id, &name)
+    let summary = db::create_workspace(&state.pool, auth_user.user.id, &name)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -59,7 +68,7 @@ pub async fn create_workspace(
         &state.workspace_registry,
         &state.data_dir,
         ws_id,
-        auth_user.0.id,
+        auth_user.user.id,
         &summary.name,
     )
     .await
@@ -73,7 +82,7 @@ pub async fn get_workspace(
     auth_user: AuthUser,
     Path(workspace_id): Path<String>,
 ) -> Result<Json<WorkspaceSummary>, (StatusCode, String)> {
-    db::get_workspace(&state.pool, &workspace_id, auth_user.0.id)
+    db::get_workspace(&state.pool, &workspace_id, auth_user.user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .map(Json)
@@ -91,7 +100,7 @@ pub async fn rename_workspace(
         return Err((StatusCode::UNPROCESSABLE_ENTITY, "name must not be blank".into()));
     }
 
-    let updated = db::rename_workspace(&state.pool, &workspace_id, auth_user.0.id, &name)
+    let updated = db::rename_workspace(&state.pool, &workspace_id, auth_user.user.id, &name)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -102,7 +111,7 @@ pub async fn rename_workspace(
     // Evict from registry so the next access picks up the new name.
     state.workspace_registry.remove(&workspace_id).await;
 
-    let summary = db::get_workspace(&state.pool, &workspace_id, auth_user.0.id)
+    let summary = db::get_workspace(&state.pool, &workspace_id, auth_user.user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "workspace not found".into()))?;
@@ -115,7 +124,7 @@ pub async fn delete_workspace(
     auth_user: AuthUser,
     Path(workspace_id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let summary = db::get_workspace(&state.pool, &workspace_id, auth_user.0.id)
+    let summary = db::get_workspace(&state.pool, &workspace_id, auth_user.user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "workspace not found".into()))?;
@@ -127,7 +136,7 @@ pub async fn delete_workspace(
         &state.workspace_registry,
         &state.data_dir,
         ws_id,
-        auth_user.0.id,
+        auth_user.user.id,
         &summary.name,
     )
     .await
@@ -143,7 +152,7 @@ pub async fn delete_workspace(
         ));
     }
 
-    db::delete_workspace(&state.pool, &workspace_id, auth_user.0.id)
+    db::delete_workspace(&state.pool, &workspace_id, auth_user.user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

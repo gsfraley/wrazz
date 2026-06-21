@@ -1,0 +1,221 @@
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sectionTitle {
+  flex: 1;
+}
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.addBtn:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--ink-muted);
+}
+
+.addBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.wsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wsItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--border);
+}
+
+.wsInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.wsName {
+  font-size: 13px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wsDetail {
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.removeBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-muted);
+  padding: 3px;
+  border-radius: 3px;
+}
+
+.removeBtn:hover {
+  color: var(--danger);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.empty {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  margin: 0;
+  padding: 4px 0;
+}
+
+.connectRow {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.connectInput {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  outline: none;
+}
+
+.connectInput:focus {
+  border-color: var(--ink-muted);
+}
+
+.connectInput:disabled {
+  opacity: 0.5;
+}
+
+.connectBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.connectBtn:hover:not(:disabled) {
+  border-color: var(--ink-muted);
+}
+
+.connectBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.error {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  color: var(--danger);
+  margin: 0;
+}
+
+/* ── Appearance preference rows ── */
+.prefRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.prefLabel {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink);
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
+.prefSelect {
+  appearance: auto;
+  padding: 4px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.prefSelect:focus {
+  border-color: var(--ink-muted);
+}
+
+.prefHint {
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: var(--ink-muted);
+  margin: 0;
+}

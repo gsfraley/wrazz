@@ -418,3 +418,164 @@ pub async fn delete_expired_sessions(pool: &SqlitePool) -> sqlx::Result<u64> {
         .await?;
     Ok(r.rows_affected())
 }
+
+// --- API token queries ---
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct ApiTokenRow {
+    pub id: String,
+    pub user_id: Uuid,
+    pub name: String,
+    pub token_hash: String,
+    pub scopes: String, // JSON array string
+    pub created_at: DateTime<Utc>,
+    pub last_used_at: Option<DateTime<Utc>>,
+}
+
+/// Creates a new API token row and returns it. The caller is responsible for
+/// passing an already-hashed token string; the raw token is never stored.
+pub async fn create_api_token(
+    pool: &SqlitePool,
+    user_id: Uuid,
+    name: &str,
+    token_hash: &str,
+    scopes: &[String],
+) -> sqlx::Result<ApiTokenRow> {
+    let id = Uuid::new_v4().to_string();
+    let scopes_json =
+        serde_json::to_string(scopes).unwrap_or_else(|_| r#"["workspace/*"]"#.to_string());
+    sqlx::query(
+        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(&id)
+    .bind(user_id)
+    .bind(name)
+    .bind(token_hash)
+    .bind(&scopes_json)
+    .execute(pool)
+    .await?;
+
+    get_api_token_by_id(pool, &id)
+        .await
+        .map(|r| r.expect("just inserted"))
+}
+
+pub async fn get_api_token_by_id(
+    pool: &SqlitePool,
+    id: &str,
+) -> sqlx::Result<Option<ApiTokenRow>> {
+    sqlx::query_as::<_, ApiTokenRow>(
+        "SELECT id, user_id, name, token_hash, scopes, created_at, last_used_at \
+         FROM api_tokens WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+/// Finds an API token by matching the raw token against stored hashes.
+/// Updates `last_used_at` on a hit. Returns `None` if no match is found.
+///
+/// Fetches all token rows joined with their owner and verifies with argon2 in
+/// Rust. Token counts are small (typically <10 per user) so this is fine.
+pub async fn find_api_token_by_raw(
+    pool: &SqlitePool,
+    raw_token: &str,
+) -> sqlx::Result<Option<(ApiTokenRow, User)>> {
+    // Internal join row — only used inside this function.
+    #[derive(sqlx::FromRow)]
+    struct TokenWithUser {
+        // token fields
+        id: String,
+        user_id: Uuid,
+        name: String,
+        token_hash: String,
+        scopes: String,
+        created_at: DateTime<Utc>,
+        last_used_at: Option<DateTime<Utc>>,
+        // user fields (aliased to avoid collision with token.id)
+        uid: Uuid,
+        display_name: String,
+        ucreated_at: DateTime<Utc>,
+        is_admin: bool,
+        email: Option<String>,
+    }
+
+    let rows = sqlx::query_as::<_, TokenWithUser>(
+        r#"SELECT t.id, t.user_id, t.name, t.token_hash, t.scopes,
+                  t.created_at, t.last_used_at,
+                  u.id AS uid, u.display_name, u.created_at AS ucreated_at,
+                  u.is_admin, u.email
+           FROM api_tokens t
+           JOIN users u ON u.id = t.user_id"#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    for row in rows {
+        let parsed = match argon2::PasswordHash::new(&row.token_hash) {
+            Ok(h) => h,
+            Err(_) => continue,
+        };
+        use argon2::PasswordVerifier;
+        if argon2::Argon2::default()
+            .verify_password(raw_token.as_bytes(), &parsed)
+            .is_ok()
+        {
+            // Touch last_used_at — best-effort, ignore errors.
+            let _ = sqlx::query(
+                "UPDATE api_tokens SET last_used_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') \
+                 WHERE id = ?",
+            )
+            .bind(&row.id)
+            .execute(pool)
+            .await;
+
+            let token_row = ApiTokenRow {
+                id: row.id,
+                user_id: row.user_id,
+                name: row.name,
+                token_hash: row.token_hash,
+                scopes: row.scopes,
+                created_at: row.created_at,
+                last_used_at: row.last_used_at,
+            };
+            let user = User {
+                id: row.uid,
+                display_name: row.display_name,
+                created_at: row.ucreated_at,
+                is_admin: row.is_admin,
+                email: row.email,
+            };
+            return Ok(Some((token_row, user)));
+        }
+    }
+
+    Ok(None)
+}
+
+pub async fn list_api_tokens_for_user(
+    pool: &SqlitePool,
+    user_id: Uuid,
+) -> sqlx::Result<Vec<ApiTokenRow>> {
+    sqlx::query_as::<_, ApiTokenRow>(
+        "SELECT id, user_id, name, token_hash, scopes, created_at, last_used_at \
+         FROM api_tokens WHERE user_id = ? ORDER BY created_at ASC",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn delete_api_token(
+    pool: &SqlitePool,
+    id: &str,
+    user_id: Uuid,
+) -> sqlx::Result<bool> {
+    let r = sqlx::query("DELETE FROM api_tokens WHERE id = ? AND user_id = ?")
+        .bind(id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(r.rows_affected() > 0)
+}

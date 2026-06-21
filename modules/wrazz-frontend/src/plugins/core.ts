@@ -1,6 +1,8 @@
 import type { Plugin } from "@/lib/plugin";
-import { Save, RotateCcw, FilePlus, FolderPlus, Download } from "@/icons";
+import { Save, RotateCcw, FilePlus, FolderPlus, Download, Settings } from "@/icons";
 import { triggerDownload } from "@/lib/triggerDownload";
+import { isDesktop } from "@/lib/api";
+import { useUIStore } from "@/stores/uiStore";
 
 export const corePlugin: Plugin = {
   id: "core",
@@ -46,7 +48,7 @@ export const corePlugin: Plugin = {
       present: (ctx) => ctx.editor.activeFile !== null,
       run: (ctx) => {
         const path = ctx.editor.activeFile?.path;
-        if (path) triggerDownload(`/api/export/file/${path.replace(/^\/|\/$/g, "")}`);
+        if (path) triggerDownload(`/api/v1/export/file/${path.replace(/^\/|\/$/g, "")}`);
       },
     },
     {
@@ -74,7 +76,16 @@ export const corePlugin: Plugin = {
       icon: Download,
       group: "WORKSPACE",
       present: () => true,
-      run: () => { triggerDownload("/api/export/dir"); },
+      run: () => { triggerDownload("/api/v1/export/dir"); },
+    },
+    {
+      type: "command",
+      label: "Desktop settings",
+      keywords: ["settings", "preferences", "appearance", "window", "decorations"],
+      icon: Settings,
+      group: "DESKTOP",
+      present: () => isDesktop(),
+      run: () => { useUIStore.getState().openModal("desktop-settings"); },
     },
   ],
 };

@@ -3,6 +3,7 @@ members = [
     "modules/wrazz-core",
     "modules/wrazz-backend",
     "modules/wrazz-server",
+    "modules/wrazz-desktop",
 ]
 resolver = "2"
 

@@ -5,11 +5,13 @@ import type { CurrentUser } from "@/api/auth";
 import type { ActiveContext } from "@/lib/plugin";
 import type { ContextMenuProps, ContextMenuItem } from "@/components/ContextMenu";
 import type { VerticalAnchor, HorizontalAnchor } from "@/lib/contextMenu";
+import type { DesktopPrefs } from "@/types";
 import { useDocumentStore } from "@/stores/documentStore";
 
 export type { ActiveContext };
 
 const SIDEBAR_MIN = 200;
+const SIDEBAR_MIN_LEFT_CONTROLS = 220; // slightly wider when window controls are on the left
 const SIDEBAR_MAX = 520;
 export const SIDEBAR_DEFAULT = 240;
 
@@ -22,10 +24,13 @@ interface UIState {
   user: CurrentUser | null;
 
   // Modals
-  activeModal: "profile" | "admin" | null;
+  activeModal: "profile" | "admin" | "desktop-settings" | "connect" | null;
 
   // Inline rename trigger (set by plugin/tree ops; consumed by useFileTreeOperations)
   inlineEditPath: string | null;
+
+  // Desktop window preferences (null until fetched from Tauri on desktop)
+  desktopPrefs: DesktopPrefs | null;
 
   // Command palette
   paletteOpen: boolean;
@@ -44,8 +49,9 @@ interface UIState {
   ) => void;
   closeCtxMenu: () => void;
   setUser: (user: CurrentUser | null) => void;
-  openModal: (id: "profile" | "admin") => void;
+  openModal: (id: "profile" | "admin" | "desktop-settings" | "connect") => void;
   closeModal: () => void;
+  setDesktopPrefs: (prefs: DesktopPrefs) => void;
   setInlineEditPath: (path: string | null) => void;
   setPaletteOpen: (open: boolean) => void;
   openConfirm: (message: string) => Promise<boolean>;
@@ -59,12 +65,15 @@ export const useUIStore = create<UIState>((set, get) => ({
   ctxMenu: null,
   user: null,
   activeModal: null,
+  desktopPrefs: null,
   inlineEditPath: null,
   paletteOpen: false,
   confirmRequest: null,
 
-  setSidebarWidth: (w) =>
-    set({ sidebarWidth: Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, w)) }),
+  setSidebarWidth: (w) => {
+    const min = get().desktopPrefs?.buttonSide === "left" ? SIDEBAR_MIN_LEFT_CONTROLS : SIDEBAR_MIN;
+    set({ sidebarWidth: Math.max(min, Math.min(SIDEBAR_MAX, w)) });
+  },
 
   setActiveCtx: (activeCtx) => set({ activeCtx }),
 
@@ -104,6 +113,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   openModal: (id) => set({ activeModal: id }),
 
   closeModal: () => set({ activeModal: null }),
+
+  setDesktopPrefs: (prefs) => set({ desktopPrefs: prefs }),
 
   setInlineEditPath: (path) => set({ inlineEditPath: path }),
 

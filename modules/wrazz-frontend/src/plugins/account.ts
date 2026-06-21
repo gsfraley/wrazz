@@ -1,5 +1,6 @@
 import type { Plugin } from "@/lib/plugin";
 import { User, Settings, LogOut } from "@/icons";
+import { isDesktop } from "@/lib/api";
 
 export const accountPlugin: Plugin = {
   id: "account",
@@ -10,7 +11,7 @@ export const accountPlugin: Plugin = {
       keywords: ["profile", "email", "account"],
       icon: User,
       defaultVisible: false,
-      present: () => true,
+      present: () => !isDesktop(),
       run: (ctx) => { ctx.openModal("profile"); },
     },
     {
@@ -19,7 +20,7 @@ export const accountPlugin: Plugin = {
       keywords: ["admin", "users", "sso"],
       icon: Settings,
       defaultVisible: false,
-      present: (ctx) => ctx.user.isAdmin,
+      present: (ctx) => !isDesktop() && ctx.user.isAdmin,
       run: (ctx) => { ctx.openModal("admin"); },
     },
     {
@@ -28,7 +29,7 @@ export const accountPlugin: Plugin = {
       keywords: ["logout", "sign out"],
       icon: LogOut,
       defaultVisible: false,
-      present: () => true,
+      present: () => !isDesktop(),
       run: async (ctx) => { await ctx.logout(); },
     },
   ],

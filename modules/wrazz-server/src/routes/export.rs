@@ -54,9 +54,13 @@ impl From<wrazz_core::BackendError> for ApiError {
 async fn resolve(
     state: &AppState,
     workspace_id: Uuid,
-    user_id: Uuid,
+    auth: &AuthUser,
 ) -> Result<std::sync::Arc<dyn wrazz_core::Workspace>, ApiError> {
-    let ws_info = db::get_workspace(&state.pool, &workspace_id.to_string(), user_id)
+    if !auth.workspace_allowed(&workspace_id.to_string()) {
+        return Err(ApiError::WorkspaceNotFound);
+    }
+
+    let ws_info = db::get_workspace(&state.pool, &workspace_id.to_string(), auth.user.id)
         .await?
         .ok_or(ApiError::WorkspaceNotFound)?;
 
@@ -64,7 +68,7 @@ async fn resolve(
         &state.workspace_registry,
         &state.data_dir,
         workspace_id,
-        user_id,
+        auth.user.id,
         &ws_info.name,
     )
     .await
@@ -78,7 +82,7 @@ pub(crate) async fn export_file(
     auth_user: AuthUser,
     Path((workspace_id, rel)): Path<(Uuid, String)>,
 ) -> Result<Response, ApiError> {
-    let ws = resolve(&state, workspace_id, auth_user.0.id).await?;
+    let ws = resolve(&state, workspace_id, &auth_user).await?;
     let content = ws.get_file_content(&format!("/{rel}")).await?;
     let filename = rel.split('/').next_back().unwrap_or(&rel).to_string();
 
@@ -94,7 +98,7 @@ pub(crate) async fn export_dir(
     auth_user: AuthUser,
     Path((workspace_id, rel)): Path<(Uuid, String)>,
 ) -> Result<Response, ApiError> {
-    build_zip_response(state, auth_user.0.id, workspace_id, &rel).await
+    build_zip_response(state, auth_user, workspace_id, &rel).await
 }
 
 pub(crate) async fn export_dir_root(
@@ -102,17 +106,17 @@ pub(crate) async fn export_dir_root(
     auth_user: AuthUser,
     Path(workspace_id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
-    build_zip_response(state, auth_user.0.id, workspace_id, "").await
+    build_zip_response(state, auth_user, workspace_id, "").await
 }
 
 async fn build_zip_response(
     state: AppState,
-    user_id: Uuid,
+    auth_user: AuthUser,
     workspace_id: Uuid,
     raw_rel: &str,
 ) -> Result<Response, ApiError> {
     let rel_path = raw_rel.trim_matches('/');
-    let ws = resolve(&state, workspace_id, user_id).await?;
+    let ws = resolve(&state, workspace_id, &auth_user).await?;
 
     let walk_root = if rel_path.is_empty() { "/".to_string() } else { format!("/{rel_path}") };
     let file_paths = ws.walk_files(&walk_root).await?;

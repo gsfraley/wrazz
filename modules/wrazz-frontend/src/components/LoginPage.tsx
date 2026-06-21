@@ -80,7 +80,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             <div className={styles.loginDivider}>
               <span className={styles.loginDividerLabel}>or</span>
             </div>
-            <a className={styles.loginSso} href="/api/auth/oidc/redirect">
+            <a className={styles.loginSso} href="/api/v1/auth/oidc/redirect">
               sign in with SSO
             </a>
           </>

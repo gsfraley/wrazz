@@ -101,9 +101,13 @@ pub struct MoveRequest {
 async fn resolve(
     state: &AppState,
     workspace_id: Uuid,
-    user_id: Uuid,
+    auth: &AuthUser,
 ) -> Result<std::sync::Arc<dyn wrazz_core::Workspace>, ApiError> {
-    let ws_info = db::get_workspace(&state.pool, &workspace_id.to_string(), user_id)
+    if !auth.workspace_allowed(&workspace_id.to_string()) {
+        return Err(ApiError::WorkspaceNotFound);
+    }
+
+    let ws_info = db::get_workspace(&state.pool, &workspace_id.to_string(), auth.user.id)
         .await?
         .ok_or(ApiError::WorkspaceNotFound)?;
 
@@ -111,7 +115,7 @@ async fn resolve(
         &state.workspace_registry,
         &state.data_dir,
         workspace_id,
-        user_id,
+        auth.user.id,
         &ws_info.name,
     )
     .await
@@ -126,7 +130,7 @@ pub(crate) async fn list_entries(
     Path(workspace_id): Path<Uuid>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<Entry>>, ApiError> {
-    let ws = resolve(&state, workspace_id, auth_user.0.id).await?;
+    let ws = resolve(&state, workspace_id, &auth_user).await?;
     Ok(Json(ws.list_entries(&q.path).await?))
 }
 
@@ -135,7 +139,7 @@ pub(crate) async fn get_file(
     auth_user: AuthUser,
     Path((workspace_id, rel)): Path<(Uuid, String)>,
 ) -> Result<Json<FileEntry>, ApiError> {
-    let ws = resolve(&state, workspace_id, auth_user.0.id).await?;
+    let ws = resolve(&state, workspace_id, &auth_user).await?;
     Ok(Json(ws.get_file(&format!("/{rel}")).await?))
 }
 
@@ -144,7 +148,7 @@ pub(crate) async fn get_file_content(
     auth_user: AuthUser,
     Path((workspace_id, rel)): Path<(Uuid, String)>,
 ) -> Result<Json<FileContent>, ApiError> {
-    let ws = resolve(&state, workspace_id, auth_user.0.id).await?;
+    let ws = resolve(&state, workspace_id, &auth_user).await?;
     Ok(Json(ws.get_file_content(&format!("/{rel}")).await?))
 }
 
@@ -154,7 +158,7 @@ pub(crate) async fn create_file(
     Path((workspace_id, rel)): Path<(Uuid, String)>,
     Json(req): Json<CreateFileRequest>,
 ) -> Result<(StatusCode, Json<FileEntry>), ApiError> {
-    let ws = resolve(&state, workspace_id, auth_user.0.id).await?;
+    let ws = resolve(&state, workspace_id, &auth_user).await?;
     let entry = ws.create_file(&format!("/{rel}"), req.title, req.tags, req.content).await?;
     Ok((StatusCode::CREATED, Json(entry)))
 }
@@ -165,7 +169,7 @@ pub(crate) async fn update_file(
     Path((workspace_id, rel)): Path<(Uuid, String)>,
     Json(req): Json<UpdateFileRequest>,
 ) -> Result<Json<FileEntry>, ApiError> {
-    let ws = resolve(&state, workspace_id, auth_user.0.id).await?;
+    let ws = resolve(&state, workspace_id, &auth_user).await?;
     Ok(Json(ws.update_file(&format!("/{rel}"), req.title, req.tags, req.content).await?))
 }
 
@@ -174,7 +178,7 @@ pub(crate) async fn delete_entry(
     auth_user: AuthUser,
     Path((workspace_id, rel)): Path<(Uuid, String)>,
 ) -> Result<StatusCode, ApiError> {
-    let ws = resolve(&state, workspace_id, auth_user.0.id).await?;
+    let ws = resolve(&state, workspace_id, &auth_user).await?;
     ws.delete_entry(&format!("/{rel}")).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -184,7 +188,7 @@ pub(crate) async fn create_dir(
     auth_user: AuthUser,
     Path((workspace_id, rel)): Path<(Uuid, String)>,
 ) -> Result<StatusCode, ApiError> {
-    let ws = resolve(&state, workspace_id, auth_user.0.id).await?;
+    let ws = resolve(&state, workspace_id, &auth_user).await?;
     ws.create_dir(&format!("/{rel}/")).await?;
     Ok(StatusCode::CREATED)
 }
@@ -195,7 +199,7 @@ pub(crate) async fn move_entry(
     Path((workspace_id, rel)): Path<(Uuid, String)>,
     Json(req): Json<MoveRequest>,
 ) -> Result<StatusCode, ApiError> {
-    let ws = resolve(&state, workspace_id, auth_user.0.id).await?;
+    let ws = resolve(&state, workspace_id, &auth_user).await?;
     ws.move_entry(&format!("/{rel}"), &req.to_path).await?;
     Ok(StatusCode::NO_CONTENT)
 }

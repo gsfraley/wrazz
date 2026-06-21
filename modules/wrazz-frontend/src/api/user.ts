@@ -1,9 +1,9 @@
 import { apiFetch, ApiError } from "@/lib/apiError";
-import type { CurrentUser } from "@/api/auth";
+import type { CurrentUser } from "@/api/v1/auth";
 
 export async function updateSelf(email: string | null): Promise<CurrentUser> {
   try {
-    const resp = await apiFetch("/api/user/self", {
+    const resp = await apiFetch("/api/v1/user/self", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),

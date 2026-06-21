@@ -11,16 +11,37 @@ use crate::state::AppState;
 /// Name of the session cookie set on login and cleared on logout.
 pub const SESSION_COOKIE: &str = "wrazz_session";
 
+/// Source of authentication for a request.
+pub enum AuthSource {
+    /// Session cookie — full access to all of the user's resources.
+    Session,
+    /// API token — access restricted to the listed workspace scopes.
+    Token { scopes: Vec<String> },
+}
+
 /// Axum extractor that authenticates the current request.
 ///
-/// Reads the [`SESSION_COOKIE`] from the request headers, parses it as a
-/// UUID, and resolves it against the `sessions` table. If the session exists
-/// and hasn't expired, the associated [`User`] is returned.
-///
+/// Tries session cookie first; falls back to `Authorization: Bearer <token>`.
 /// Any handler that requires authentication simply declares `auth_user:
 /// AuthUser` as a parameter. Unauthenticated or expired requests are rejected
 /// with `401 Unauthorized` before the handler body runs.
-pub struct AuthUser(pub User);
+pub struct AuthUser {
+    pub user: User,
+    pub source: AuthSource,
+}
+
+impl AuthUser {
+    /// Returns `true` if the given workspace ID is within this request's scope.
+    pub fn workspace_allowed(&self, workspace_id: &str) -> bool {
+        match &self.source {
+            AuthSource::Session => true,
+            AuthSource::Token { scopes } => {
+                let target = format!("workspace/{workspace_id}");
+                scopes.iter().any(|s| s == "workspace/*" || s == &target)
+            }
+        }
+    }
+}
 
 impl<S> axum::extract::FromRequestParts<S> for AuthUser
 where
@@ -37,19 +58,42 @@ where
         // hold a reference to `parts` or `state` across the await point.
         let app_state = AppState::from_ref(state);
         let jar = CookieJar::from_headers(&parts.headers);
+        let bearer = parts
+            .headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .map(|s| s.to_string());
 
         async move {
-            let session_id = jar
+            // 1. Try session cookie.
+            if let Some(session_id) = jar
                 .get(SESSION_COOKIE)
                 .and_then(|c| Uuid::parse_str(c.value()).ok())
-                .ok_or((StatusCode::UNAUTHORIZED, "missing or invalid session"))?;
+            {
+                if let Ok(Some(user)) =
+                    db::get_session_user(&app_state.pool, session_id).await
+                {
+                    return Ok(AuthUser { user, source: AuthSource::Session });
+                }
+            }
 
-            let user = db::get_session_user(&app_state.pool, session_id)
-                .await
-                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "database error"))?
-                .ok_or((StatusCode::UNAUTHORIZED, "session expired or not found"))?;
+            // 2. Try Bearer token.
+            if let Some(raw) = bearer {
+                let result = db::find_api_token_by_raw(&app_state.pool, &raw)
+                    .await
+                    .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "database error"))?;
+                if let Some((token_row, user)) = result {
+                    let scopes: Vec<String> = serde_json::from_str(&token_row.scopes)
+                        .unwrap_or_else(|_| vec!["workspace/*".to_string()]);
+                    return Ok(AuthUser {
+                        user,
+                        source: AuthSource::Token { scopes },
+                    });
+                }
+            }
 
-            Ok(AuthUser(user))
+            Err((StatusCode::UNAUTHORIZED, "authentication required"))
         }
     }
 }
